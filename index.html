@@ -1776,6 +1776,7 @@ function watchSignal(d,verdict){
 
 // ── LIVE DATA MODE ──
 let liveMode=false,liveTimer=null,liveFixtureId=null,liveCountdown=30;
+let _fetchingMatches=false,_fetchingStats=false;
 
 // ── Slider helper — sets value, fill gradient and display text ──
 function setSl(sliderId, displayId, value, isXG=false){
@@ -1819,6 +1820,8 @@ function setLiveMode(on){
 }
 
 async function fetchLiveMatches(){
+  if(_fetchingMatches) return;
+  _fetchingMatches=true;
   const sel=document.getElementById('matchSelect');
   const st=document.getElementById('lvStatus');
   st.innerHTML='<span class="lv-dot"></span>Načítavam live zápasy...';
@@ -1858,6 +1861,8 @@ async function fetchLiveMatches(){
     const msg=e.message||'Neznáma chyba';
     st.textContent='Chyba: '+msg.slice(0,60);
     sel.innerHTML=`<option value="">✕ ${msg.slice(0,40)}</option>`;
+  }finally{
+    _fetchingMatches=false;
   }
 }
 
@@ -1871,7 +1876,8 @@ async function selectMatch(id){
 
 // Core: fetch → map to sliders → optionally run scoring
 async function applyMatchStats(triggerRun=false){
-  if(!liveFixtureId)return;
+  if(!liveFixtureId||_fetchingStats) return;
+  _fetchingStats=true;
   const st=document.getElementById('lvStatus');
   st.innerHTML='<span class="lv-dot"></span>Načítavam štatistiky...';
   try{
@@ -1925,6 +1931,8 @@ async function applyMatchStats(triggerRun=false){
     console.error('[APEX LIVE] error:',e);
     st.textContent='Chyba: '+e.message.slice(0,60);
     aiLog('Chyba načítania štatistík: '+e.message.slice(0,40),'err');
+  }finally{
+    _fetchingStats=false;
   }
 }
 
