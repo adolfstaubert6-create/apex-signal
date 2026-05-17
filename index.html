@@ -1568,7 +1568,8 @@ function run(){
     else if(verdict==='POČKAŤ'){d1.className='sdt sdt-g';d2.className='sdt sdt-a';d3.className='sdt sdt-a';}
     else{d1.className='sdt sdt-a';d2.className='sdt sdt-r';d3.className='sdt sdt-r';}
 
-    // Save
+    // Save — mark timestamp so watchSignal skips duplicate auto-save within 35s
+    _lastRunSaveMs=Date.now();
     addSig({home,away,sH:d.sH,sA:d.sA,min:d.minute,mkt:MKT[d.market],sig:d.score,v:verdict,mode,stake,time:new Date().toTimeString().slice(0,5)});
 
     stopStandbyRot(); // verdict is set — stop standby rotation
@@ -1728,6 +1729,7 @@ function startAmbientLog(){
 
 // ── AUTO SIGNAL WATCHER ──
 let lastConfidence=0;
+let _lastRunSaveMs=0; // timestamp of last save from run() — watchSignal skips within 35s
 
 function watchSignal(d,verdict){
   const conf=d.score;
@@ -1756,18 +1758,22 @@ function watchSignal(d,verdict){
       document.querySelector('.col-center').style.borderRight='1px solid rgba(0,255,136,.55)';
       const fl=document.getElementById('eFlash');
       fl.className='';void fl.offsetWidth;fl.className='on';
-      aiLog('AUTO-ALERT: Prah VSTÚPIŤ dosiahnutý — signál uložený','alert');
-      // Auto-save to history
-      const home=document.getElementById('home').value||'Live Zápas';
-      const away=document.getElementById('away').value||'';
-      addSig({
-        home,away,
-        sH:d.sH,sA:d.sA,min:d.minute,
-        mkt:MKT[d.market],sig:d.score,
-        v:verdict,mode,
-        stake:getStake(d.score,mode),
-        time:new Date().toTimeString().slice(0,5)
-      });
+      // Only auto-save if run() hasn't already saved this signal within 35s
+      if(Date.now()-_lastRunSaveMs>35000){
+        aiLog('AUTO-ALERT: Prah VSTÚPIŤ dosiahnutý — signál uložený','alert');
+        const home=document.getElementById('home').value||'Live Zápas';
+        const away=document.getElementById('away').value||'';
+        addSig({
+          home,away,
+          sH:d.sH,sA:d.sA,min:d.minute,
+          mkt:MKT[d.market],sig:d.score,
+          v:verdict,mode,
+          stake:getStake(d.score,mode),
+          time:new Date().toTimeString().slice(0,5)
+        });
+      } else {
+        aiLog('AUTO-ALERT: Prah VSTÚPIŤ dosiahnutý','alert');
+      }
     }
   }
 
