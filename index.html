@@ -1245,31 +1245,34 @@ function getStake(sc,m){
 }
 
 // ── LIVE CONDITIONS (center panel preview) ──
+// Thresholds mirror the highest-scoring tier in calcScore() so a green
+// checkmark means the criterion is at full value, not just partial.
 function getConds(d){
   const{market:m,total,sH,sA,shots,attacks,corners,poss,xg,pressure,minute}=d;
   if(m==='over05') return[
-    {t:'Minúta 60–78',   p:minute>=60&&minute<=78},
-    {t:'xG ≥ 1.2',       p:xg>=1.2},
-    {t:'Strely ≥ 4',     p:shots>=4},
-    {t:'Útoky ≥ 35',     p:attacks>=35},
-    {t:'Tlak ≥ 6/10',    p:pressure>=6},
+    {t:'Minúta 60–78',   p:minute>=60&&minute<=78},      // 15pts tier
+    {t:'xG ≥ 2.0',       p:xg>=2.0},                    // 20pts tier
+    {t:'Strely ≥ 6',     p:shots>=6},                    // 15pts tier
+    {t:'Útoky ≥ 50',     p:attacks>=50},                 // 15pts tier
+    {t:'Tlak ≥ 8/10',    p:pressure>=8},                 // 15pts tier
     {t:'Skóre OK',        p:(sH<=1&&sA<=1&&total<=2)||((sH===2&&sA===1)||(sH===1&&sA===2))},
   ];
   if(m==='over25') return[
-    {t:'Góly ≥ 1',        p:total>=1},
-    {t:'Minúta 30–70',   p:minute>=30&&minute<=70},
-    {t:'xG ≥ 1.5',       p:xg>=1.5},
-    {t:'Strely ≥ 5',     p:shots>=5},
-    {t:'Tlak ≥ 6/10',    p:pressure>=6},
-    {t:'Útoky ≥ 35',     p:attacks>=35},
+    {t:'Góly ≥ 2',        p:total>=2},                   // 25pts tier
+    {t:'Minúta 30–70',   p:minute>=30&&minute<=70},      // 15pts tier
+    {t:'xG ≥ 2.5',       p:xg>=2.5},                    // 20pts tier
+    {t:'Strely ≥ 7',     p:shots>=7},                    // 15pts tier
+    {t:'Útoky ≥ 55',     p:attacks>=55},                 // 10pts tier
+    {t:'Tlak ≥ 8/10',    p:pressure>=8},                 // 10pts tier
   ];
+  // BTTS
   return[
-    {t:'Minúta 25–70',   p:minute>=25&&minute<=70},
-    {t:'xG ≥ 1.0',       p:xg>=1.0},
-    {t:'Possession 40–60%', p:poss>=40&&poss<=60},
-    {t:'Strely ≥ 3',     p:shots>=3},
-    {t:'Útoky ≥ 35',     p:attacks>=35},
-    {t:'Tlak ≥ 6/10',    p:pressure>=6},
+    {t:'Minúta 25–70',      p:minute>=25&&minute<=70},   // 15pts tier
+    {t:'xG ≥ 2.0',          p:xg>=2.0},                 // 15pts tier
+    {t:'Possession 45–55%', p:poss>=45&&poss<=55},       // 10pts tier
+    {t:'Strely ≥ 4',        p:shots>=4},                 // 15pts tier (max for BTTS)
+    {t:'Útoky ≥ 50',        p:attacks>=50},              // 15pts tier
+    {t:'Tlak ≥ 8/10',       p:pressure>=8},              // 10pts tier
   ];
 }
 
