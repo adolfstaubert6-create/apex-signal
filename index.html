@@ -812,48 +812,68 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
       </div>
     </div>
     <div class="col-body">
-      <!-- LIVE / MANUAL toggle -->
-      <div class="lm-row">
-        <div class="lm-btn lm-on" id="btnManual" onclick="setLiveMode(false)">MANUAL</div>
-        <div class="lm-btn" id="btnLive" onclick="setLiveMode(true)">● LIVE</div>
-      </div>
-      <!-- Live match selector -->
-      <div class="lv-panel" id="livePanel" style="display:none">
-        <div class="fg">
-          <label>Vyber live zápas</label>
-          <select id="matchSelect" onchange="selectMatch(this.value)">
-            <option value="">— načítavam —</option>
-          </select>
-        </div>
-        <div class="lv-status" id="lvStatus">—</div>
+      <!-- ── LIVE ZÁPAS SELECTOR ── -->
+      <div class="fg" style="margin-bottom:6px">
+        <label style="letter-spacing:2px">LIVE ZÁPAS</label>
+        <select id="matchSelect" onchange="selectMatch(this.value)" style="font-size:13px;font-weight:700;padding:8px 10px">
+          <option value="">— vyber zápas —</option>
+        </select>
+        <div class="lv-status" id="lvStatus" style="margin-top:4px">—</div>
       </div>
 
-      <div class="fg"><label>Domáci tím</label><input type="text" id="home" placeholder="Domáci tím"/></div>
-      <div class="fg"><label>Hosťujúci tím</label><input type="text" id="away" placeholder="Hosťujúci tím"/></div>
-      <div class="fg"><label>Skóre</label>
-        <div class="srow">
-          <input type="number" id="scoreH" value="0" min="0" max="20" oninput="lu()"/>
-          <div class="ssep">:</div>
-          <input type="number" id="scoreA" value="0" min="0" max="20" oninput="lu()"/>
+      <!-- ── LIVE MATCH CARD ── -->
+      <div id="liveMatchCard" style="background:var(--bg3);border:1px solid var(--bd);border-radius:4px;padding:11px 12px;margin-bottom:8px;transition:border-color .35s">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:7px;color:var(--mut);letter-spacing:2.5px;text-transform:uppercase">⚽ LIVE ZÁPAS</div>
+          <div id="livePill" style="font-family:'IBM Plex Mono',monospace;font-size:7px;color:#1a3a1a;background:rgba(0,255,136,.04);border:1px solid rgba(0,255,136,.1);padding:2px 8px;border-radius:2px;letter-spacing:1px;transition:all .3s">● LIVE</div>
+        </div>
+        <div id="liveMatchName" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--mut);min-height:16px;margin-bottom:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Žiadny zápas</div>
+        <div style="display:flex;align-items:center;gap:5px">
+          <input type="number" id="scoreH" value="0" min="0" max="20" oninput="lu()"
+            style="width:40px;font-size:18px;font-weight:700;text-align:center;padding:4px 2px;
+                   background:transparent;border:1px solid var(--bd);border-radius:2px;
+                   color:var(--c);font-family:'IBM Plex Mono',monospace;outline:none"/>
+          <div style="font-family:'Orbitron',sans-serif;font-size:16px;color:var(--mut)">:</div>
+          <input type="number" id="scoreA" value="0" min="0" max="20" oninput="lu()"
+            style="width:40px;font-size:18px;font-weight:700;text-align:center;padding:4px 2px;
+                   background:transparent;border:1px solid var(--bd);border-radius:2px;
+                   color:var(--c);font-family:'IBM Plex Mono',monospace;outline:none"/>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--mut);margin:0 4px">•</div>
+          <input type="number" id="minute" value="45" min="1" max="90" oninput="lu()"
+            style="width:44px;font-size:14px;font-weight:700;text-align:center;padding:4px 2px;
+                   background:transparent;border:1px solid var(--bd);border-radius:2px;
+                   color:var(--c);font-family:'IBM Plex Mono',monospace;outline:none"/>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--mut)">'</div>
         </div>
       </div>
-      <div class="fg"><label>Minúta</label><input type="number" id="minute" value="45" min="1" max="90" oninput="lu()"/></div>
-      <!-- Hidden market select — controlled by AI auto-select, not user -->
+
+      <!-- Team name inputs: hidden, auto-filled by live data, read by run() -->
+      <input type="text" id="home" placeholder="Domáci" style="display:none"/>
+      <input type="text" id="away" placeholder="Hosťujúci" style="display:none"/>
+
+      <!-- ── AI MONITOR STATUS ── -->
+      <div style="border:1px solid rgba(0,255,136,.1);border-radius:4px;padding:10px 12px;margin-bottom:8px">
+        <div id="aiMonitorMsg" style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:rgba(0,255,136,.45);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">AI MONITORUJE ZÁPAS</div>
+        <div id="aiStatusItems" style="display:flex;flex-direction:column;gap:3px"></div>
+      </div>
+
+      <!-- Hidden market select — driven by AI auto-select -->
       <select id="market" style="display:none">
         <option value="goal_alert">GOAL ALERT</option>
         <option value="btts">BOTH TEAMS SCORE</option>
         <option value="next_goal">NEXT GOAL</option>
         <option value="late_goal">LATE GOAL</option>
       </select>
-      <!-- AI auto-selected market display -->
+      <!-- AI signal display -->
       <div class="fg">
-        <label>AI VÝBER</label>
+        <label>AI VÝBER SIGNÁLU</label>
         <div id="aiMarketBox" style="background:var(--bg3);border:1px solid var(--bd);border-radius:2px;padding:7px 10px;display:flex;align-items:center;justify-content:space-between;min-height:36px">
           <span id="aiMarketLabel" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--mut);letter-spacing:.5px">— čakám na dáta —</span>
           <span id="aiMarketScore" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--mut)"></span>
         </div>
       </div>
       <div class="dvd"></div>
+
       <div style="font-size:7px;letter-spacing:2px;color:var(--mut);margin-bottom:5px;text-transform:uppercase">ANALYTICKÝ REŽIM</div>
       <div class="mrow">
         <div class="mbtn" id="mode-safe" onclick="setMode('safe')">SAFE</div>
@@ -1399,6 +1419,58 @@ function _autoSelectMarket(){
   return chosen;
 }
 
+// ── LIVE CARD + AI STATUS UPDATERS ──────────────────────────
+function _updateLiveCard(){
+  const home=document.getElementById('home')?.value||'';
+  const away=document.getElementById('away')?.value||'';
+  const nameEl=document.getElementById('liveMatchName');
+  const cardEl=document.getElementById('liveMatchCard');
+  const monitorEl=document.getElementById('aiMonitorMsg');
+  if(nameEl){
+    const name=home&&away?home+' vs '+away:'Žiadny zápas';
+    nameEl.textContent=name;
+    nameEl.style.color=home?'var(--c)':'var(--mut)';
+  }
+  // AI monitor message
+  const best=_lastCalcData?getBestSignal(calcAllMarkets()):null;
+  if(monitorEl){
+    if(best&&(best.verdict==='ENTER'||best.verdict==='HIGH ALERT')){
+      monitorEl.textContent='SILNÝ SIGNÁL — VSTÚPIŤ';monitorEl.style.color='var(--g)';
+    }else if(best&&best.verdict==='WAIT'){
+      monitorEl.textContent='SIGNAL SA BUDUJE — POČKAŤ';monitorEl.style.color='var(--a)';
+    }else if(best&&best.verdict==='WATCH'){
+      monitorEl.textContent='SLEDOVAŤ — SLABÉ PODMIENKY';monitorEl.style.color='#00d4ff';
+    }else{
+      monitorEl.textContent='AI MONITORUJE ZÁPAS';monitorEl.style.color='rgba(0,255,136,.45)';
+    }
+  }
+  if(cardEl&&home){
+    const bc=best?(VERDICT_COLOR[best.verdict]||'var(--bd)')+'44':'var(--bd)';
+    cardEl.style.borderColor=bc;
+  }
+}
+
+function _updateAiStatus(){
+  const el=document.getElementById('aiStatusItems');if(!el)return;
+  const d=_lastCalcData||{};
+  const vel=_getVelocity();
+  const items=[
+    {label:'tempo zápasu',  active:(d.attacks||0)>25||(d.shots||0)>3},
+    {label:'momentum',      active:vel&&vel.score>3},
+    {label:'tlak tímov',    active:(d.pressure||0)>=5},
+    {label:'rast xG',       active:(d.xg||0)>=1.0||(vel&&vel.xg>0.1)},
+    {label:'rast útokov',   active:vel&&vel.attacks>4},
+  ];
+  el.innerHTML=items.map(item=>`
+    <div style="display:flex;align-items:center;gap:7px">
+      <span style="width:5px;height:5px;border-radius:50%;flex-shrink:0;
+        background:${item.active?'var(--g)':'#1e1e1e'};
+        ${item.active?'box-shadow:0 0 5px var(--g)':''}"></span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.3px;
+        color:${item.active?'var(--text2)':'#2a2a2a'}">${item.label}</span>
+    </div>`).join('');
+}
+
 function lu(){
   _autoSelectMarket();
   const d=calcScore();
@@ -1418,6 +1490,8 @@ function lu(){
   updateGraph(d.invalidated?0:d.score);
   _lastCalcData=d;
   _renderBestSignal();
+  _updateLiveCard();
+  _updateAiStatus();
 }
 
 // ── ALL MARKETS ENGINE ───────────────────────────────────────
@@ -2272,9 +2346,14 @@ function setSl(sliderId, displayId, value, isXG=false){
 
 function setLiveMode(on){
   liveMode=on;
-  document.getElementById('btnManual').className='lm-btn'+(on?'':' lm-on');
-  document.getElementById('btnLive').className='lm-btn'+(on?' lm-live':'');
-  document.getElementById('livePanel').style.display=on?'block':'none';
+  // Toggle buttons removed from UI — guard silently
+  const btnM=document.getElementById('btnManual');
+  const btnL=document.getElementById('btnLive');
+  if(btnM)btnM.className='lm-btn'+(on?'':' lm-on');
+  if(btnL)btnL.className='lm-btn'+(on?' lm-live':'');
+  // livePanel wrapper removed — live controls always visible now
+  const livePill=document.getElementById('livePill');
+  if(livePill){livePill.style.color=on?'#00ff88':'#1a3a1a';livePill.style.borderColor=on?'rgba(0,255,136,.4)':'rgba(0,255,136,.1)';}
   if(on){
     fetchLiveMatches();
     liveCountdown=30;
@@ -2796,6 +2875,8 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closeBSNModal();});
 
 // ── INIT ──
 initSliders();lu();refreshCounts();renderHistory();renderPerf();startSB();startTbRotation();startAmbientLog();startStandbyRot();
+// Auto-activate live mode — app always starts in live monitoring state
+setLiveMode(true);
 requestAnimationFrame(()=>{initGraph();});
 </script>
 
