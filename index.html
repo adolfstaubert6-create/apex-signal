@@ -1,0 +1,2277 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>APEX SIGNAL V2</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --c:#00fff7;--cd:#00bdb8;--cg:rgba(0,255,247,.2);
+  --r:#ff2d55;--rg:rgba(255,45,85,.35);
+  --g:#00ff88;--gg:rgba(0,255,136,.38);
+  --a:#ffb300;--ag:rgba(255,179,0,.35);
+  --bg:#010b0f;--bg2:#030e14;--bg3:#051218;--bg4:#071622;
+  --bd:rgba(0,255,247,.12);--bdh:rgba(0,255,247,.42);
+  --txt:#b0e4e2;--mut:#365e5c;
+  --tb:36px;--hb:28px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;overflow:hidden;}
+body{font-family:'Share Tech Mono',monospace;background:var(--bg);color:var(--txt);}
+
+/* scanlines */
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.05) 2px,rgba(0,0,0,.05) 4px);pointer-events:none;z-index:9000;}
+/* grid */
+body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,255,247,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,247,.02) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0;}
+
+/* ── ENTER FLASH ── */
+#eFlash{position:fixed;inset:0;background:rgba(0,255,136,.2);z-index:9800;pointer-events:none;opacity:0;}
+#eFlash.on{animation:eFlashAnim .32s ease-out forwards;}
+@keyframes eFlashAnim{0%{opacity:1}40%{opacity:.7}100%{opacity:0}}
+
+/* ── PAGE SCAN ── */
+#pgScan{position:fixed;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,var(--c) 25%,#fff 50%,var(--c) 75%,transparent);box-shadow:0 0 20px var(--c),0 0 50px var(--cg);z-index:9500;pointer-events:none;opacity:0;top:-3px;}
+#pgScan.run{opacity:1;animation:pgScanAnim 1.8s linear forwards;}
+@keyframes pgScanAnim{0%{top:0}100%{top:100vh}}
+
+/* ── CENTER AMBIENT SCAN ── */
+#ambScan{position:fixed;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(0,255,247,.3),transparent);pointer-events:none;z-index:8;opacity:0;top:var(--tb);}
+#ambScan.active{opacity:1;animation:ambScanAnim 9s linear infinite;}
+@keyframes ambScanAnim{0%{top:var(--tb);opacity:0}4%{opacity:.4}94%{opacity:.4}100%{top:calc(100% - var(--hb));opacity:0}}
+
+/* ── TOPBAR ── */
+#topbar{position:fixed;top:0;left:0;right:0;height:var(--tb);background:var(--bg2);border-bottom:1px solid var(--bd);display:flex;align-items:center;z-index:1000;padding:0 14px;}
+#topbar::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(0,255,247,.22),transparent);}
+.tb-logo{font-family:'Orbitron',sans-serif;font-size:13px;font-weight:900;letter-spacing:5px;color:var(--c);text-shadow:0 0 12px var(--c);flex-shrink:0;}
+.tb-logo b{color:#fff;font-weight:900;}
+.tb-sep{width:1px;height:18px;background:var(--bd);margin:0 12px;flex-shrink:0;}
+.tb-sys{display:flex;align-items:center;gap:6px;font-size:9px;letter-spacing:2px;color:var(--mut);flex-shrink:0;}
+.tb-dot{width:6px;height:6px;border-radius:50%;background:var(--g);box-shadow:0 0 7px var(--g);animation:blk 2s infinite;flex-shrink:0;}
+@keyframes blk{0%,100%{opacity:1}50%{opacity:.15}}
+.tb-sp{flex:1;}
+.tb-ai{font-size:8px;letter-spacing:3px;color:var(--mut);flex-shrink:0;transition:color .3s;}
+.tb-ai.live{color:var(--g);}.tb-ai.busy{color:var(--c);animation:blk .6s infinite;}.tb-ai.warn{color:var(--a);}.tb-ai.red{color:var(--r);}
+.tb-clk{font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;color:var(--c);letter-spacing:2px;flex-shrink:0;margin-left:12px;}
+.tb-sig{font-size:8px;letter-spacing:2px;color:var(--mut);flex-shrink:0;margin-left:10px;}
+.tb-sig b{color:var(--c);}
+.tb-ticket{
+  font-family:'Orbitron',sans-serif;font-size:8px;font-weight:700;letter-spacing:2px;
+  color:var(--c);border:1px solid rgba(0,255,247,.4);border-radius:2px;
+  padding:3px 9px;cursor:pointer;background:rgba(0,255,247,.06);
+  transition:all .2s;flex-shrink:0;margin-left:10px;
+}
+.tb-ticket:hover{background:rgba(0,255,247,.14);box-shadow:0 0 10px var(--cg);}
+
+/* ── LAYOUT ── */
+.app{position:fixed;top:var(--tb);bottom:var(--hb);left:0;right:0;display:grid;grid-template-columns:minmax(190px,22fr) minmax(0,46fr) minmax(240px,30fr);z-index:1;}
+
+/* ── COLUMN ── */
+.col{height:100%;display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--bd);}
+.col:last-child{border-right:none;}
+.col-hdr{flex-shrink:0;background:inherit;border-bottom:1px solid var(--bd);padding:7px 12px;display:flex;align-items:center;justify-content:space-between;position:relative;}
+.col-hdr::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--c),transparent);opacity:.3;}
+.cht{font-family:'Orbitron',sans-serif;font-size:8px;font-weight:700;letter-spacing:4px;color:var(--c);display:flex;align-items:center;gap:5px;}
+.cht::before{content:'//';opacity:.28;}
+.chb{font-size:7px;letter-spacing:2px;color:var(--mut);padding:2px 6px;border:1px solid var(--bd);border-radius:2px;transition:color .3s,border-color .3s;}
+.col-body{flex:1;overflow:hidden;padding:7px 11px;}
+.col-left{background:var(--bg2);}
+.col-center{background:var(--bg);position:relative;}
+.col-center::before{content:'';position:absolute;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(0,255,247,.42),transparent);opacity:0;pointer-events:none;z-index:6;top:28px;animation:colCenterScan 7s linear infinite;}
+@keyframes colCenterScan{0%{top:28px;opacity:0}3%{opacity:.48}95%{opacity:.48}100%{top:100%;opacity:0}}
+.col-right{background:var(--bg2);transition:box-shadow .6s;position:relative;}
+.col-right.enter-mode{animation:entPulse 2s ease-in-out infinite;}
+.col-right.enter-mode::after{
+  content:'';position:absolute;inset:0;pointer-events:none;z-index:50;
+  border:1px solid rgba(0,255,136,.5);
+  animation:enterBorder 2s ease-in-out infinite;
+}
+@keyframes enterBorder{
+  0%,100%{border-color:rgba(0,255,136,.35);box-shadow:inset 0 0 20px rgba(0,255,136,.06);}
+  50%    {border-color:#00ff88;box-shadow:inset 0 0 50px rgba(0,255,136,.18);}
+}
+@keyframes entPulse{
+  0%,100%{box-shadow:0 0 40px #00ff88,0 0 80px rgba(0,255,136,.27),inset 0 0 60px rgba(0,255,136,.1);}
+  50%    {box-shadow:0 0 60px #00ff88,0 0 120px rgba(0,255,136,.45),inset 0 0 100px rgba(0,255,136,.22);}
+}
+
+/* ── LEFT INPUTS ── */
+.fg{margin-bottom:7px;}
+.fg label{display:block;font-size:8px;letter-spacing:2px;color:var(--mut);margin-bottom:3px;text-transform:uppercase;}
+input[type=text],input[type=number],select{
+  width:100%;background:var(--bg3);border:1px solid var(--bd);
+  border-radius:2px;color:var(--c);font-family:'Share Tech Mono',monospace;
+  font-size:15px;padding:7px 10px;outline:none;
+  transition:border-color .2s,box-shadow .2s;
+}
+#matchSelect{font-size:15px;font-weight:700;padding:8px 10px;}
+input:focus,select:focus{border-color:var(--c);box-shadow:0 0 10px rgba(0,255,247,.13);}
+select option{background:#0a1a20;color:var(--c);}
+.srow{display:grid;grid-template-columns:1fr 20px 1fr;gap:5px;align-items:center;}
+.ssep{text-align:center;font-family:'Orbitron',sans-serif;font-size:14px;color:var(--mut);}
+.dvd{height:1px;background:var(--bd);margin:8px 0;}
+
+/* ── MODE BUTTONS ── */
+.mrow{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:8px;}
+.mbtn{padding:7px 2px;background:var(--bg3);border:1px solid var(--bd);border-radius:2px;color:var(--mut);font-family:'Orbitron',sans-serif;font-size:8px;font-weight:700;letter-spacing:3px;cursor:pointer;text-align:center;transition:all .2s;user-select:none;}
+.mbtn:hover{border-color:var(--cd);color:var(--c);}
+.mbtn.ms{background:rgba(0,255,136,.07);border-color:var(--g);color:var(--g);}
+.mbtn.mb{background:rgba(0,255,247,.07);border-color:var(--c);color:var(--c);}
+.mbtn.ma{background:rgba(255,45,85,.07);border-color:var(--r);color:var(--r);}
+
+/* ── RUN BUTTON ── */
+.rbtn{width:100%;padding:10px;background:transparent;border:1px solid var(--c);border-radius:2px;color:var(--c);font-family:'Orbitron',sans-serif;font-size:10px;font-weight:900;letter-spacing:5px;cursor:pointer;transition:all .25s;position:relative;overflow:hidden;}
+.rbtn::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(0,255,247,.1),transparent);transition:left .4s;}
+.rbtn:hover::before{left:100%;}
+.rbtn:hover{background:rgba(0,255,247,.05);box-shadow:0 0 18px rgba(0,255,247,.16);}
+.rbtn:active{transform:scale(.99);}
+.rbtn.busy{border-color:var(--mut);color:var(--mut);pointer-events:none;}
+.lbar{display:none;height:1px;background:linear-gradient(90deg,var(--bg),var(--c),var(--bg));background-size:200%;animation:lsl 1s linear infinite;margin-top:6px;}
+.lbar.on{display:block;}
+@keyframes lsl{0%{background-position:100%}100%{background-position:-100%}}
+.tlog{display:none;margin-top:8px;background:var(--bg3);border:1px solid var(--bd);border-radius:2px;padding:7px 10px;font-size:9px;color:var(--mut);}
+.tlog.on{display:block;}
+.tl{margin-bottom:1px;opacity:0;transition:opacity .2s;}.tl.show{opacity:1;}
+.tl-ok{color:var(--g);}.tl-hi{color:var(--a);}
+
+/* ── CENTER: LIVE PREVIEW ── */
+.lp{background:var(--bg2);border:1px solid var(--bd);border-radius:3px;padding:7px 10px;margin-bottom:8px;}
+.lp-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;}
+.lp-lbl{font-size:8px;letter-spacing:3px;color:var(--mut);}
+.lp-num{font-family:'Orbitron',sans-serif;font-size:28px;font-weight:900;color:var(--c);line-height:1;transition:color .3s;}
+.lp-bg{height:2px;background:var(--bg4);border-radius:2px;overflow:hidden;}
+.lp-bar{height:100%;border-radius:2px;transition:width .35s,background .35s;}
+.lp-bot{display:flex;align-items:center;justify-content:space-between;margin-top:5px;}
+.smsg{font-size:8px;letter-spacing:2px;color:var(--mut);}
+.lvtag{font-family:'Orbitron',sans-serif;font-size:7px;font-weight:700;letter-spacing:2px;padding:2px 7px;border-radius:1px;border:1px solid currentColor;}
+
+/* ── SLIDERS ── */
+.slg{margin-bottom:6px;}
+.slh{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;}
+.sll{font-size:8px;letter-spacing:1px;color:var(--mut);text-transform:uppercase;}
+.slr{display:flex;align-items:center;gap:5px;}
+.slv{font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;color:var(--c);min-width:36px;text-align:right;}
+.sllvl{font-size:7px;font-weight:700;width:24px;text-align:right;}
+.lvl-h{color:var(--g);}.lvl-m{color:var(--a);}.lvl-l{color:var(--mut);}
+input[type=range]{-webkit-appearance:none;width:100%;height:2px;background:var(--bg4);border-radius:2px;outline:none;cursor:pointer;}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;border-radius:50%;background:var(--c);box-shadow:0 0 6px var(--c);cursor:pointer;}
+
+/* ── LIVE CONDITIONS (center) ── */
+.lc-t{font-size:7px;letter-spacing:3px;color:var(--mut);margin:7px 0 4px;}
+.lc-g{display:grid;grid-template-columns:1fr 1fr;gap:3px;}
+.lci{display:flex;align-items:center;gap:4px;padding:3px 7px;border-radius:2px;background:var(--bg2);border-left:2px solid transparent;transition:border-color .25s,opacity .25s;}
+.lci.pass{border-color:var(--g);}.lci.fail{border-color:rgba(255,45,85,.18);opacity:.5;}
+.lci-i{font-size:9px;flex-shrink:0;}
+.lci.pass .lci-i{color:var(--g);}.lci.fail .lci-i{color:rgba(255,45,85,.3);}
+.lci-t{font-size:8px;color:var(--txt);}.lci.fail .lci-t{color:var(--mut);}
+
+/* ── RIGHT: AI TERMINAL ── */
+.ait{background:var(--bg3);border:1px solid var(--bd);border-radius:3px;overflow:hidden;margin-bottom:8px;}
+.aith{display:flex;align-items:center;justify-content:space-between;padding:5px 10px;border-bottom:1px solid var(--bd);background:rgba(0,255,247,.025);}
+.ai-id{font-family:'Orbitron',sans-serif;font-size:8px;font-weight:700;letter-spacing:3px;color:var(--c);}
+.ai-st{font-size:7px;letter-spacing:2px;transition:color .3s;}
+.ai-st.sb{color:var(--mut);}.ai-st.an{color:var(--c);animation:blk .5s infinite;}.ai-st.ok{color:var(--g);}.ai-st.le{color:var(--r);}.ai-st.mo{color:var(--a);}
+.ai-dots{display:flex;gap:4px;}
+.ai-dots span{width:5px;height:5px;border-radius:50%;}
+.ai-dots span:nth-child(1){background:var(--r);}
+.ai-dots span:nth-child(2){background:var(--a);}
+.ai-dots span:nth-child(3){background:var(--g);}
+
+/* Full-width tactical SVG operator */
+.ai-hud{padding:5px 10px 4px;border-bottom:1px solid var(--bd);}
+@keyframes scanHf{0%,100%{transform:translateY(0)}50%{transform:translateY(9px)}}
+@keyframes sigBf{from{opacity:.15}to{opacity:.9}}
+@keyframes eyeP{0%,100%{opacity:.85}50%{opacity:.18}}
+
+.ai-msg-zone{padding:6px 10px;}
+.aip{font-size:8px;color:var(--mut);margin-bottom:4px;letter-spacing:1px;}
+.aip span{color:var(--c);}
+.aio{font-size:10px;color:var(--txt);line-height:1.6;}
+.aipc{color:var(--c);margin-right:4px;}
+.aic{display:inline-block;width:6px;height:10px;background:var(--c);margin-left:2px;vertical-align:middle;animation:cblink 1s infinite;}
+@keyframes cblink{0%,100%{opacity:1}50%{opacity:0}}
+.ai-foot{display:flex;gap:12px;padding:5px 10px;border-top:1px solid var(--bd);font-size:7px;letter-spacing:1px;color:var(--mut);}
+.ai-sg{display:flex;align-items:center;gap:4px;}
+.sdt{width:4px;height:4px;border-radius:50%;animation:blk 1.5s infinite;}
+.sdt-g{background:var(--g);box-shadow:0 0 4px var(--g);}
+.sdt-a{background:var(--a);box-shadow:0 0 4px var(--a);}
+.sdt-r{background:var(--r);box-shadow:0 0 4px var(--r);animation:none;}
+
+/* ── RIGHT: SCORE ── */
+.snum-b{text-align:center;margin-bottom:10px;}
+.snum{font-family:'Orbitron',sans-serif;font-size:clamp(60px,8vw,100px);font-weight:900;line-height:1;color:var(--c);transition:color .4s,text-shadow .4s;}
+.slbl{font-size:8px;letter-spacing:3px;color:var(--mut);margin-top:3px;}
+
+/* ── CONFIDENCE ── */
+.cf{margin-bottom:9px;}
+.cfrow{display:flex;justify-content:space-between;margin-bottom:4px;}
+.cfl{font-size:9px;letter-spacing:2px;color:var(--mut);}
+.cfp{font-family:'Orbitron',sans-serif;font-size:14px;font-weight:700;color:var(--mut);transition:color .4s;}
+.cfbg{height:4px;background:var(--bg4);border-radius:2px;overflow:hidden;}
+.cfbar{height:100%;border-radius:2px;transition:width 1.3s ease,background .4s;}
+
+/* ── PROB BADGE ── */
+.pbadge{display:none;align-items:center;gap:5px;font-family:'Orbitron',sans-serif;font-size:8px;font-weight:700;letter-spacing:3px;padding:3px 10px;border-radius:2px;border:1px solid currentColor;margin-bottom:7px;}
+.pb-dot{width:5px;height:5px;border-radius:50%;background:currentColor;animation:blk 1.2s infinite;}
+.pb-h{color:var(--g);background:rgba(0,255,136,.07);}
+.pb-m{color:var(--a);background:rgba(255,179,0,.07);}
+.pb-l{color:var(--r);background:rgba(255,45,85,.07);}
+
+/* ── VERDICT ── */
+.vbox{border:1px solid var(--bd);border-radius:3px;padding:18px 14px;text-align:center;transition:all .4s;position:relative;margin-bottom:9px;}
+.vbox::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,currentColor,transparent);opacity:.55;}
+.vtxt{font-family:'Orbitron',sans-serif;font-size:clamp(1.4rem,3.5vw,2.2rem);font-weight:900;letter-spacing:4px;line-height:1.1;}
+.vsub{font-size:10px;letter-spacing:2px;color:var(--mut);margin-top:7px;}
+.vs-sb{border-color:var(--bd);color:var(--mut);overflow:hidden;}
+.vs-sb .vtxt{color:var(--mut);animation:sbPulse 2s ease-in-out infinite;}
+@keyframes sbPulse{0%,100%{opacity:.45}50%{opacity:1}}
+/* Standby scanline */
+.vs-sb::after{
+  content:'';position:absolute;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(0,255,247,.35),transparent);
+  opacity:0;pointer-events:none;top:0;
+  animation:sbScan 5s linear infinite;
+}
+@keyframes sbScan{0%{top:0;opacity:0}5%{opacity:.4}94%{opacity:.4}100%{top:100%;opacity:0}}
+.vs-v{border-color:var(--g);color:var(--g);background:rgba(0,255,136,.04);box-shadow:0 0 18px rgba(0,255,136,.1),inset 0 0 18px rgba(0,255,136,.04);}
+.vs-v .vtxt{color:var(--g);animation:vgp 1.6s ease-in-out infinite;}
+.vs-a{border-color:var(--a);color:var(--a);background:rgba(255,179,0,.04);box-shadow:0 0 18px rgba(0,255,179,.1),inset 0 0 18px rgba(255,179,0,.04);}
+.vs-a .vtxt{color:var(--a);text-shadow:0 0 20px var(--a),0 0 50px var(--ag);animation:agp 2s ease-in-out infinite alternate;}
+.vs-r{border-color:var(--r);color:var(--r);background:rgba(255,45,85,.04);box-shadow:0 0 18px rgba(255,45,85,.1),inset 0 0 18px rgba(255,45,85,.04);}
+.vs-r .vtxt{color:var(--r);text-shadow:0 0 20px var(--r),0 0 50px var(--rg);animation:rgp 2s ease-in-out infinite alternate;}
+@keyframes vgp{
+  0%  {text-shadow:0 0 14px var(--g),0 0 36px var(--gg);transform:scale(1);opacity:1;}
+  50% {text-shadow:0 0 52px var(--g),0 0 100px var(--gg),0 0 180px rgba(0,255,136,.2);transform:scale(1.05);opacity:.84;}
+  100%{text-shadow:0 0 14px var(--g),0 0 36px var(--gg);transform:scale(1);opacity:1;}
+}
+@keyframes agp{from{text-shadow:0 0 14px var(--a),0 0 30px var(--ag);}to{text-shadow:0 0 32px var(--a),0 0 80px var(--ag),0 0 120px rgba(255,179,0,.1);}}
+@keyframes rgp{from{text-shadow:0 0 14px var(--r),0 0 30px var(--rg);}to{text-shadow:0 0 32px var(--r),0 0 80px var(--rg),0 0 120px rgba(255,45,85,.1);}}
+
+/* ── STAKE ROW ── */
+.strow{display:none;gap:6px;margin-bottom:10px;}
+.stchip{flex:1;background:var(--bg3);border:1px solid var(--bd);border-radius:3px;padding:12px 10px;}
+.stl{font-size:8px;letter-spacing:2px;color:var(--mut);margin-bottom:5px;text-transform:uppercase;}
+.stv{font-family:'Orbitron',sans-serif;font-size:14px;font-weight:700;color:var(--c);text-shadow:0 0 10px rgba(0,255,247,.5);}
+
+/* ── RIGHT CONDITIONS ── */
+.rcw{display:none;margin-top:2px;}
+.rct{font-size:9px;letter-spacing:2px;color:var(--c);opacity:.6;margin-bottom:5px;}
+.rcg{display:grid;grid-template-columns:1fr 1fr;gap:4px;}
+.rci{display:flex;align-items:center;gap:5px;padding:4px 8px;background:var(--bg4);border-radius:2px;border-left:2px solid transparent;}
+.rci.pass{border-color:var(--g);}.rci.fail{border-color:rgba(255,45,85,.2);opacity:.5;}
+.rci-i{font-size:11px;}.rci.pass .rci-i{color:var(--g);}.rci.fail .rci-i{color:rgba(255,45,85,.35);}
+.rci-t{font-size:9px;color:#c0dde0;}.rci.fail .rci-t{color:var(--mut);}
+
+/* ── HISTORY BAR (fixed bottom) ── */
+#hbar{
+  position:fixed;bottom:0;left:0;right:0;
+  background:var(--bg2);border-top:1px solid var(--bd);
+  z-index:500;overflow:hidden;
+  transition:height .32s cubic-bezier(.4,0,.2,1);
+  height:var(--hb);
+}
+#hbar.open{height:252px;}
+#hbar::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(0,255,247,.28),transparent);}
+
+.hb-hdr{height:var(--hb);display:flex;align-items:center;padding:0 14px;cursor:pointer;gap:10px;flex-shrink:0;user-select:none;}
+.hb-ttl{font-family:'Orbitron',sans-serif;font-size:8px;font-weight:700;letter-spacing:3px;color:var(--c);display:flex;align-items:center;gap:5px;white-space:nowrap;}
+.hb-ttl::before{content:'//';opacity:.28;}
+.hb-roi-inline{font-size:8px;letter-spacing:1px;color:var(--mut);white-space:nowrap;}
+.hb-roi-inline .roi-pos{color:var(--g);}.hb-roi-inline .roi-neg{color:var(--r);}
+.hb-cnts{display:flex;gap:10px;font-size:8px;letter-spacing:1px;flex-shrink:0;}
+.hcc-e{color:var(--g);}.hcc-w{color:var(--a);}.hcc-n{color:var(--r);}
+.hb-sp{flex:1;}
+.hb-clr{font-size:7px;letter-spacing:2px;color:var(--mut);cursor:pointer;border:1px solid var(--bd);border-radius:2px;padding:2px 7px;background:none;font-family:'Share Tech Mono',monospace;transition:all .2s;flex-shrink:0;}
+.hb-clr:hover{color:var(--r);border-color:rgba(255,45,85,.35);box-shadow:0 0 6px rgba(255,45,85,.15);}
+.hb-tog{font-size:10px;color:var(--mut);margin-left:4px;transition:transform .3s;flex-shrink:0;}
+#hbar.open .hb-tog{transform:rotate(180deg);}
+
+.hb-cards{display:flex;gap:7px;overflow-x:auto;padding:4px 14px 6px;scrollbar-width:thin;scrollbar-color:var(--bd) transparent;height:calc(252px - var(--hb) - 44px);}
+.hb-cards::-webkit-scrollbar{height:2px;}
+.hb-cards::-webkit-scrollbar-thumb{background:rgba(0,255,247,.2);border-radius:2px;}
+
+/* Cards */
+.hcard{
+  flex-shrink:0;width:240px;background:var(--bg3);
+  border:1px solid var(--bd);border-left:3px solid var(--bd);
+  border-radius:3px;padding:7px 10px;
+  animation:hcIn .25s ease both;transition:border-color .25s,box-shadow .25s;
+  position:relative;
+}
+@keyframes hcIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
+
+/* Verdict border (top) */
+.hcard.hv{border-top:2px solid var(--g);}
+.hcard.ha{border-top:2px solid var(--a);}
+.hcard.hr{border-top:2px solid var(--r);}
+
+/* ROI result left border + glow */
+.hcard.roi-win {border-left-color:var(--g);box-shadow:inset 3px 0 8px rgba(0,255,136,.12);}
+.hcard.roi-loss{border-left-color:var(--r);box-shadow:inset 3px 0 8px rgba(255,45,85,.12);}
+.hcard.roi-void{border-left-color:var(--c);box-shadow:inset 3px 0 6px rgba(0,255,247,.08);}
+.hcard.roi-ns  {border-left-color:var(--mut);}
+
+/* Delete button */
+.hc-del{
+  position:absolute;top:5px;right:6px;
+  background:none;border:none;color:var(--mut);font-size:11px;
+  cursor:pointer;padding:1px 4px;line-height:1;border-radius:2px;
+  transition:color .15s,background .15s;
+}
+.hc-del:hover{color:var(--r);background:rgba(255,45,85,.12);}
+
+.hc-m{font-size:9px;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;padding-right:18px;}
+.hc-meta{font-size:7px;color:var(--mut);letter-spacing:1px;margin-bottom:5px;}
+.hc-row{display:flex;align-items:center;justify-content:space-between;}
+.hc-sc{font-family:'Orbitron',sans-serif;font-size:17px;font-weight:900;line-height:1;}
+.hc-b{font-family:'Orbitron',sans-serif;font-size:6px;font-weight:700;letter-spacing:2px;padding:2px 5px;border-radius:2px;border:1px solid currentColor;}
+.hc-b.bv{color:var(--g);background:rgba(0,255,136,.06);}
+.hc-b.ba{color:var(--a);background:rgba(255,179,0,.06);}
+.hc-b.br{color:var(--r);background:rgba(255,45,85,.06);}
+.hc-t{font-size:7px;color:var(--mut);}
+.h-empty{font-size:9px;color:var(--mut);letter-spacing:2px;padding:8px 0;}
+
+/* ── AI ROBOT SIDE-BY-SIDE ── */
+.ai-body-row{display:flex;gap:10px;align-items:center;padding:7px 10px 6px;border-bottom:1px solid var(--bd);}
+.ai-svg-col{flex-shrink:0;}
+.ai-msg-col{flex:1;min-width:0;}
+@keyframes hexScan{0%,100%{transform:translateY(0)}50%{transform:translateY(9px)}}
+@keyframes hexBlink{0%,100%{opacity:1}50%{opacity:.1}}
+@keyframes hexSig{from{opacity:.1}to{opacity:.95}}
+
+/* ── PRESSURE GRAPH ── */
+.pgwrap{background:var(--bg4);border:1px solid var(--bd);border-radius:2px;overflow:hidden;margin-bottom:6px;}
+.pglbl{display:flex;align-items:center;justify-content:space-between;padding:2px 8px;border-bottom:1px solid var(--bd);}
+.pglbl-t{font-size:7px;letter-spacing:2px;color:var(--mut);}
+.pglbl-v{font-family:'Orbitron',sans-serif;font-size:8px;font-weight:700;color:var(--c);}
+
+/* ── SCORE BREAKDOWN ── */
+.bdwrap{display:none;margin-top:6px;}
+.bdt-hdr{font-size:9px;letter-spacing:2px;color:var(--c);opacity:.65;margin-bottom:6px;}
+.bd-scroll{max-height:200px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(0,255,247,.2) transparent;}
+.bd-scroll::-webkit-scrollbar{width:3px;}
+.bd-scroll::-webkit-scrollbar-track{background:transparent;}
+.bd-scroll::-webkit-scrollbar-thumb{background:rgba(0,255,247,.25);border-radius:2px;}
+.bditem{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:3px;background:var(--bg4);margin-bottom:3px;border-left:2px solid transparent;}
+.bditem.ok{border-color:var(--g);}.bditem.no{border-color:rgba(255,45,85,.18);opacity:.5;}
+.bdl{font-size:13px;color:#c8e4e8;line-height:1.3;}.bditem.no .bdl{color:var(--mut);}
+.bdp{font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;}
+.bditem.ok .bdp{color:var(--g);}.bditem.no .bdp{color:var(--mut);}
+.bd-sum{display:flex;justify-content:space-between;padding:7px 10px 3px;border-top:1px solid var(--bd);margin-top:4px;}
+.bd-sum-l{font-size:9px;letter-spacing:2px;color:var(--mut);}
+.bd-sum-v{font-family:'Orbitron',sans-serif;font-size:13px;font-weight:700;color:var(--c);}
+
+/* ── PERFORMANCE PANEL ── */
+.hb-perf{display:none;padding:6px 14px;border-bottom:1px solid var(--bd);background:var(--bg3);height:44px;flex-shrink:0;align-items:center;}
+#hbar.open .hb-perf{display:flex;}
+.perf-blk{display:flex;align-items:center;gap:14px;flex-wrap:nowrap;width:100%;}
+.perf-sep{width:1px;height:18px;background:var(--bd);flex-shrink:0;}
+.pstat{display:flex;flex-direction:column;align-items:center;flex-shrink:0;}
+.pstat-v{font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;color:var(--c);line-height:1;}
+.pstat-l{font-size:6px;letter-spacing:2px;color:var(--mut);margin-top:2px;text-transform:uppercase;}
+.pstat.pos .pstat-v{color:var(--g);text-shadow:0 0 8px rgba(0,255,136,.35);}
+.pstat.neg .pstat-v{color:var(--r);text-shadow:0 0 8px rgba(255,45,85,.35);}
+.pstat.big .pstat-v{font-size:14px;}
+
+/* ── ROI HISTORY CARDS ── */
+.hc-roi{display:flex;align-items:center;gap:4px;margin-top:5px;flex-wrap:nowrap;}
+.hc-inp{background:var(--bg4);border:1px solid var(--bd);border-radius:2px;color:var(--c);font-family:'Share Tech Mono',monospace;font-size:9px;padding:2px 5px;outline:none;width:50px;transition:border-color .15s;}
+.hc-inp:focus{border-color:var(--c);}
+.hc-inp::placeholder{color:var(--mut);}
+.hcbtn{padding:2px 6px;border-radius:2px;border:1px solid var(--bd);font-family:'Orbitron',sans-serif;font-size:7px;font-weight:700;letter-spacing:1px;cursor:pointer;background:transparent;transition:all .15s;flex-shrink:0;}
+.hcbtn.w{color:rgba(0,255,136,.45);border-color:rgba(0,255,136,.18);}
+.hcbtn.w:hover,.hcbtn.w.act{color:var(--g);border-color:var(--g);background:rgba(0,255,136,.08);box-shadow:0 0 6px rgba(0,255,136,.2);}
+.hcbtn.l{color:rgba(255,45,85,.45);border-color:rgba(255,45,85,.18);}
+.hcbtn.l:hover,.hcbtn.l.act{color:var(--r);border-color:var(--r);background:rgba(255,45,85,.08);box-shadow:0 0 6px rgba(255,45,85,.2);}
+.hcbtn.x{color:rgba(100,120,130,.45);border-color:rgba(100,120,130,.18);}
+.hcbtn.x:hover,.hcbtn.x.act{color:#709ab0;border-color:#709ab0;background:rgba(100,140,160,.08);}
+.hc-pl{font-family:'Orbitron',sans-serif;font-size:9px;font-weight:700;margin-left:2px;flex-shrink:0;}
+.hc-pl.pos{color:var(--g);}.hc-pl.neg{color:var(--r);}.hc-pl.zero{color:var(--mut);}
+.hc-note-i{width:100%;margin-top:4px;background:var(--bg4);border:1px solid var(--bd);border-radius:2px;color:var(--mut);font-family:'Share Tech Mono',monospace;font-size:8px;padding:2px 6px;outline:none;transition:border-color .15s,color .15s;}
+.hc-note-i:focus{border-color:var(--cd);color:var(--txt);}
+.hc-note-i::placeholder{color:var(--mut);}
+
+/* ── LIVE MODE ── */
+.lm-row{display:flex;gap:5px;margin-bottom:9px;}
+.lm-btn{flex:1;padding:7px 2px;background:var(--bg3);border:1px solid var(--bd);border-radius:2px;color:var(--mut);font-family:'Orbitron',sans-serif;font-size:8px;font-weight:700;letter-spacing:2px;cursor:pointer;transition:all .2s;text-align:center;}
+.lm-btn:hover{border-color:var(--cd);color:var(--c);}
+.lm-btn.lm-on{border-color:var(--c);color:var(--c);background:rgba(0,255,247,.07);}
+.lm-btn.lm-live{border-color:#ff3333;color:#ff3333;background:rgba(255,51,51,.07);box-shadow:0 0 8px rgba(255,51,51,.15);animation:blk 2s infinite;}
+.lv-panel{margin-bottom:8px;}
+.lv-status{font-size:8px;color:var(--mut);letter-spacing:1px;margin-top:4px;min-height:14px;}
+.lv-dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:#ff3333;box-shadow:0 0 5px #ff3333;margin-right:4px;animation:blk 1s infinite;vertical-align:middle;}
+#matchSelect{font-size:10px;padding:5px 8px;}
+
+/* ── AI LIVE LOG ── */
+.ai-log-wrap{margin-top:6px;background:var(--bg4);border:1px solid var(--bd);border-radius:2px;overflow:hidden;}
+.ai-log-hdr{font-size:7px;letter-spacing:3px;color:var(--c);opacity:.55;padding:3px 8px;border-bottom:1px solid var(--bd);}
+.ai-log-body{min-height:160px;max-height:220px;height:auto;overflow-y:auto;padding:6px 10px;scrollbar-width:thin;scrollbar-color:var(--bd) transparent;}
+.ai-log-body::-webkit-scrollbar{width:2px;}
+.ai-log-body::-webkit-scrollbar-thumb{background:var(--bd);}
+.ai-log-line{font-size:13px;color:var(--txt);line-height:1.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.ai-log-line .ts{color:var(--mut);margin-right:6px;}
+.ai-log-line.warn{color:var(--a);}
+.ai-log-line.alert{color:var(--g);font-weight:bold;}
+.ai-log-line.err{color:var(--r);}
+
+/* ── PANEL ZOOM SYSTEM ── */
+.zoom-btn{
+  background:none;border:1px solid var(--bd);border-radius:2px;
+  color:var(--mut);font-size:11px;cursor:pointer;padding:1px 6px;
+  line-height:1.4;transition:color .2s,border-color .2s,box-shadow .2s;flex-shrink:0;
+  font-family:monospace;user-select:none;
+}
+.zoom-btn:hover{color:var(--c);border-color:var(--c);box-shadow:0 0 8px var(--cg);}
+
+/* Overlay uses opacity+pointer-events so transitions work */
+#panelOverlay{
+  position:fixed;inset:0;z-index:9999;
+  background:rgba(2,6,8,.92);
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;pointer-events:none;
+  transition:opacity .25s ease;
+}
+#panelOverlay.visible{opacity:1;pointer-events:all;}
+
+.po-inner{
+  position:relative;
+  background:var(--bg2);border:1px solid var(--bdh);border-radius:6px;
+  width:min(92vw,900px);max-height:90vh;
+  display:flex;flex-direction:column;
+  box-shadow:0 0 70px rgba(0,255,247,.15),0 0 140px rgba(0,255,247,.06);
+  transform:scale(.95);
+  transition:transform .25s cubic-bezier(.34,1.2,.64,1);
+}
+#panelOverlay.visible .po-inner{transform:scale(1);}
+
+.po-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 20px;border-bottom:1px solid var(--bd);
+  font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;
+  letter-spacing:4px;color:var(--c);flex-shrink:0;position:relative;
+}
+.po-head::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--c),transparent);opacity:.3;}
+.po-close{
+  background:none;border:1px solid var(--bd);border-radius:2px;
+  color:var(--mut);font-size:18px;line-height:1;
+  cursor:pointer;padding:2px 9px;transition:color .2s,border-color .2s,box-shadow .2s;
+}
+.po-close:hover{color:var(--r);border-color:rgba(255,45,85,.5);box-shadow:0 0 8px rgba(255,45,85,.2);}
+
+.po-body{
+  flex:1;overflow-y:auto;padding:20px 22px;
+  scrollbar-width:thin;scrollbar-color:rgba(0,255,247,.2) transparent;
+}
+.po-body::-webkit-scrollbar{width:4px;}
+.po-body::-webkit-scrollbar-track{background:transparent;}
+.po-body::-webkit-scrollbar-thumb{background:rgba(0,255,247,.25);border-radius:2px;}
+
+/* Zoom-context: scale up text/spacing in cloned content */
+.po-body .slg{margin-bottom:14px;}
+.po-body .sll{font-size:11px;}
+.po-body .slv{font-size:14px;}
+.po-body .fg{margin-bottom:14px;}
+.po-body .fg label{font-size:10px;}
+.po-body .lp-num{font-size:42px;}
+.po-body .bditem{padding:12px 14px;}
+.po-body .bdl{font-size:15px;}
+.po-body .bdp{font-size:14px;}
+.po-body .snum{font-size:clamp(70px,10vw,120px);}
+.po-body .vtxt{font-size:clamp(2rem,5vw,3.5rem)!important;}
+.po-body .ai-log-line{font-size:15px;line-height:2;}
+.po-body .ai-log-body{height:180px;}
+.po-body .vbox{padding:24px 18px;margin-bottom:14px;}
+.po-body .stchip{padding:16px 14px;}
+.po-body .stv{font-size:18px;}
+.po-body .stl{font-size:10px;}
+
+/* ── SIGNAL LOCK ── */
+.col-right.signal-lock{animation:slkPanelPulse 2s ease-in-out infinite;}
+.col-right.signal-lock::after{
+  content:'';position:absolute;inset:0;pointer-events:none;z-index:50;
+  animation:slkBorder 2s ease-in-out infinite;
+}
+@keyframes slkBorder{
+  0%,100%{box-shadow:inset 0 0 0 1px rgba(0,255,247,.35),inset 0 0 30px rgba(0,255,136,.06);}
+  50%    {box-shadow:inset 0 0 0 2px #00ff88,inset 0 0 70px rgba(0,255,136,.18);}
+}
+@keyframes slkPanelPulse{
+  0%,100%{box-shadow:0 0 25px rgba(0,255,136,.18);}
+  50%    {box-shadow:0 0 55px rgba(0,255,136,.38),0 0 100px rgba(0,255,247,.08);}
+}
+
+/* Live empty pulse */
+@keyframes liveScanPulse{0%,100%{opacity:.5}50%{opacity:1}}
+.live-scanning{animation:liveScanPulse 1.4s ease-in-out infinite;color:var(--c)!important;}
+
+/* ── AI TICKET MODAL ── */
+#ticketOverlay{
+  position:fixed;inset:0;z-index:9990;
+  background:rgba(1,8,12,.88);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;pointer-events:none;transition:opacity .25s ease;
+}
+#ticketOverlay.open{opacity:1;pointer-events:all;}
+.tkt-modal{
+  background:var(--bg2);border:1px solid var(--bdh);border-radius:6px;
+  width:min(92vw,520px);max-height:92vh;display:flex;flex-direction:column;
+  box-shadow:0 0 60px rgba(0,255,247,.14),0 0 120px rgba(0,255,247,.05);
+  transform:scale(.94) translateY(12px);
+  transition:transform .28s cubic-bezier(.34,1.2,.64,1);
+  overflow:hidden;
+}
+#ticketOverlay.open .tkt-modal{transform:scale(1) translateY(0);}
+
+.tkt-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 18px;border-bottom:1px solid var(--bd);flex-shrink:0;
+  position:relative;background:var(--bg3);
+}
+.tkt-head::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--c),transparent);opacity:.3;}
+.tkt-title{font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;letter-spacing:4px;color:var(--c);}
+.tkt-title span{color:var(--a);}
+.tkt-x{background:none;border:1px solid var(--bd);border-radius:2px;color:var(--mut);
+  font-size:16px;line-height:1;cursor:pointer;padding:2px 8px;transition:all .2s;}
+.tkt-x:hover{color:var(--r);border-color:rgba(255,45,85,.45);}
+
+.tkt-body{padding:16px 18px;overflow-y:auto;flex:1;scrollbar-width:thin;scrollbar-color:var(--bd) transparent;}
+.tkt-body::-webkit-scrollbar{width:3px;}
+.tkt-body::-webkit-scrollbar-thumb{background:var(--bd);}
+
+.tkt-sec{margin-bottom:14px;}
+.tkt-sec-lbl{font-size:8px;letter-spacing:3px;color:var(--mut);margin-bottom:7px;text-transform:uppercase;}
+
+/* Toggle button groups */
+.tkt-tog{display:flex;gap:5px;flex-wrap:wrap;}
+.tkt-tb{
+  padding:6px 12px;background:var(--bg3);border:1px solid var(--bd);border-radius:2px;
+  color:var(--mut);font-family:'Share Tech Mono',monospace;font-size:11px;
+  cursor:pointer;transition:all .18s;user-select:none;flex-shrink:0;
+}
+.tkt-tb:hover{border-color:var(--cd);color:var(--c);}
+.tkt-tb.sel{background:rgba(0,255,247,.09);border-color:var(--c);color:var(--c);box-shadow:0 0 8px var(--cg);}
+.tkt-tb.sel-a{background:rgba(255,179,0,.08);border-color:var(--a);color:var(--a);}
+
+/* Odds row */
+.tkt-odds-row{display:flex;gap:10px;align-items:center;}
+.tkt-odds-row label{font-size:8px;letter-spacing:2px;color:var(--mut);white-space:nowrap;}
+.tkt-inp{
+  width:72px;background:var(--bg3);border:1px solid var(--bd);border-radius:2px;
+  color:var(--c);font-family:'Share Tech Mono',monospace;font-size:12px;
+  padding:5px 8px;outline:none;transition:border-color .2s;
+}
+.tkt-inp:focus{border-color:var(--c);box-shadow:0 0 8px var(--cg);}
+
+/* Generate button */
+.tkt-gen{
+  width:100%;padding:13px;margin-top:4px;
+  background:transparent;border:1px solid var(--c);border-radius:3px;
+  color:var(--c);font-family:'Orbitron',sans-serif;font-size:11px;
+  font-weight:900;letter-spacing:5px;cursor:pointer;
+  transition:all .22s;position:relative;overflow:hidden;
+}
+.tkt-gen::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;
+  background:linear-gradient(90deg,transparent,rgba(0,255,247,.1),transparent);transition:left .4s;}
+.tkt-gen:hover::before{left:100%;}
+.tkt-gen:hover{background:rgba(0,255,247,.06);box-shadow:0 0 20px var(--cg);}
+.tkt-gen:active{transform:scale(.99);}
+.tkt-gen.busy{border-color:var(--mut);color:var(--mut);pointer-events:none;}
+
+/* Results */
+.tkt-result{margin-top:14px;border-top:1px solid var(--bd);padding-top:14px;}
+.tkt-result-hdr{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:10px;
+}
+.tkt-result-ttl{font-family:'Orbitron',sans-serif;font-size:9px;font-weight:700;letter-spacing:3px;color:var(--c);}
+.tkt-result-ttl::before{content:'// ';opacity:.3;}
+.tkt-total-odds{font-family:'Orbitron',sans-serif;font-size:14px;font-weight:900;color:var(--a);
+  text-shadow:0 0 10px rgba(255,179,0,.4);}
+
+.tkt-match{
+  background:var(--bg3);border:1px solid var(--bd);border-left:2px solid var(--c);
+  border-radius:3px;padding:10px 12px;margin-bottom:7px;
+  animation:tktIn .2s ease both;
+}
+@keyframes tktIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
+.tkt-match-teams{font-size:12px;color:var(--txt);margin-bottom:4px;font-weight:600;}
+.tkt-match-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.tkt-badge{font-family:'Orbitron',sans-serif;font-size:8px;font-weight:700;letter-spacing:1px;
+  padding:2px 7px;border-radius:2px;border:1px solid currentColor;}
+.tkt-badge.mkt{color:var(--c);border-color:rgba(0,255,247,.35);background:rgba(0,255,247,.06);}
+.tkt-badge.conf-h{color:var(--g);border-color:rgba(0,255,136,.4);background:rgba(0,255,136,.07);}
+.tkt-badge.conf-m{color:var(--a);border-color:rgba(255,179,0,.4);background:rgba(255,179,0,.07);}
+.tkt-badge.conf-l{color:var(--r);border-color:rgba(255,45,85,.35);background:rgba(255,45,85,.06);}
+.tkt-match-odds{font-family:'Orbitron',sans-serif;font-size:13px;font-weight:700;color:var(--c);margin-left:auto;}
+
+.tkt-summary{
+  background:var(--bg3);border:1px solid var(--bdh);border-radius:3px;
+  padding:12px 14px;margin-top:10px;
+  display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;
+}
+.tkt-sum-item{text-align:center;}
+.tkt-sum-lbl{font-size:7px;letter-spacing:2px;color:var(--mut);margin-bottom:3px;}
+.tkt-sum-val{font-family:'Orbitron',sans-serif;font-size:13px;font-weight:700;color:var(--c);}
+.tkt-sum-val.green{color:var(--g);text-shadow:0 0 8px rgba(0,255,136,.4);}
+.tkt-sum-val.amber{color:var(--a);text-shadow:0 0 8px rgba(255,179,0,.4);}
+
+/* ── AI CHAT ── */
+.tkt-chat-wrap{margin-top:14px;border-top:1px solid var(--bd);padding-top:12px;}
+.tkt-chat-hdr{font-family:'Orbitron',sans-serif;font-size:9px;font-weight:700;letter-spacing:3px;color:var(--c);margin-bottom:8px;opacity:.8;}
+.tkt-chat-hdr::before{content:'// ';opacity:.3;}
+.tkt-msgs{
+  background:var(--bg4);border:1px solid var(--bd);border-radius:3px;
+  max-height:200px;overflow-y:auto;padding:8px 10px;
+  scrollbar-width:thin;scrollbar-color:var(--bd) transparent;
+  display:flex;flex-direction:column;gap:7px;
+}
+.tkt-msgs::-webkit-scrollbar{width:3px;}
+.tkt-msgs::-webkit-scrollbar-thumb{background:var(--bd);}
+.cm{max-width:82%;display:flex;flex-direction:column;gap:2px;}
+.cm.user{align-self:flex-end;align-items:flex-end;}
+.cm.ai  {align-self:flex-start;align-items:flex-start;}
+.cm-bubble{
+  padding:6px 10px;border-radius:3px;font-size:11px;line-height:1.55;
+  white-space:pre-wrap;word-break:break-word;
+}
+.cm.user .cm-bubble{background:rgba(0,255,247,.1);border:1px solid rgba(0,255,247,.3);color:var(--c);}
+.cm.ai   .cm-bubble{background:var(--bg3);border:1px solid var(--bd);color:var(--txt);}
+.cm-who{font-size:8px;letter-spacing:2px;color:var(--mut);padding:0 2px;}
+
+/* Typing indicator */
+.cm-typing .cm-bubble{color:var(--mut);}
+.typing-dots span{display:inline-block;animation:tdot 1.2s infinite;}
+.typing-dots span:nth-child(2){animation-delay:.2s;}
+.typing-dots span:nth-child(3){animation-delay:.4s;}
+@keyframes tdot{0%,80%,100%{opacity:.25}40%{opacity:1}}
+
+/* Chat input row */
+.tkt-chat-row{display:flex;gap:7px;margin-top:8px;}
+.tkt-chat-inp{
+  flex:1;background:var(--bg3);border:1px solid var(--bd);border-radius:2px;
+  color:var(--c);font-family:'Share Tech Mono',monospace;font-size:12px;
+  padding:7px 10px;outline:none;transition:border-color .2s;
+}
+.tkt-chat-inp:focus{border-color:var(--c);box-shadow:0 0 8px var(--cg);}
+.tkt-chat-inp::placeholder{color:var(--mut);}
+.tkt-chat-send{
+  background:transparent;border:1px solid var(--c);border-radius:2px;
+  color:var(--c);font-family:'Orbitron',sans-serif;font-size:9px;font-weight:700;
+  letter-spacing:2px;padding:7px 12px;cursor:pointer;transition:all .2s;flex-shrink:0;
+}
+.tkt-chat-send:hover{background:rgba(0,255,247,.08);box-shadow:0 0 10px var(--cg);}
+.tkt-chat-send:disabled{border-color:var(--mut);color:var(--mut);cursor:default;box-shadow:none;}
+
+/* Apply change button */
+.tkt-apply-btn{
+  width:100%;margin-top:8px;padding:8px;
+  background:rgba(0,255,136,.07);border:1px solid rgba(0,255,136,.4);
+  border-radius:2px;color:var(--g);font-family:'Orbitron',sans-serif;
+  font-size:9px;font-weight:700;letter-spacing:3px;cursor:pointer;
+  transition:all .2s;display:none;
+}
+.tkt-apply-btn.visible{display:block;}
+.tkt-apply-btn:hover{background:rgba(0,255,136,.14);box-shadow:0 0 12px rgba(0,255,136,.2);}
+
+/* ── MOBILE ── */
+@media(max-width:860px){
+  html,body{overflow:auto;}
+  .app{position:static;display:flex;flex-direction:column;height:auto;}
+  .col{height:auto;overflow:visible;border-right:none;border-bottom:1px solid var(--bd);}
+  .col-right{order:-1;}
+  .col-center{order:0;}
+  .col-left{order:1;}
+  .snum{font-size:38px;}
+  .vtxt{font-size:22px!important;}
+  #hbar{position:static;height:auto;overflow:visible;}
+  #hbar.open{height:auto;}
+  .hb-cards{height:auto;flex-wrap:wrap;}
+}
+</style>
+</head>
+<body>
+
+<div id="eFlash"></div>
+<div id="pgScan"></div>
+<div id="ambScan"></div>
+
+<!-- Panel Zoom Overlay -->
+<div id="panelOverlay">
+  <div class="po-inner">
+    <div class="po-head">
+      <span id="poTitle">—</span>
+      <button class="po-close" onclick="closeZoom()" title="Zatvoriť (ESC)">✕</button>
+    </div>
+    <div class="po-body" id="poBody"></div>
+  </div>
+</div>
+
+<!-- ── TOPBAR ── -->
+<header id="topbar">
+  <div class="tb-logo">APEX <b>SIGNAL</b></div>
+  <div class="tb-sep"></div>
+  <div class="tb-sys"><span class="tb-dot"></span><span id="sysLbl">SYSTÉM AKTÍVNY</span></div>
+  <div class="tb-sp"></div>
+  <div class="tb-ai live" id="tbAi">NEURAL ENGINE ONLINE</div>
+  <div class="tb-sep"></div>
+  <div class="tb-clk" id="tbClk">--:--:--</div>
+  <div class="tb-sig">SIG:<b id="tbSig">0</b></div>
+  <button class="tb-ticket" onclick="openTicket()">⚡ AI TIKET</button>
+</header>
+
+<!-- ── AI TICKET MODAL ── -->
+<div id="ticketOverlay">
+  <div class="tkt-modal">
+    <div class="tkt-head">
+      <div class="tkt-title">⚡ AI <span>TIKET</span> GENERÁTOR</div>
+      <button class="tkt-x" onclick="closeTicket()">✕</button>
+    </div>
+    <div class="tkt-body" id="tktBody">
+
+      <!-- Typ tiketu -->
+      <div class="tkt-sec">
+        <div class="tkt-sec-lbl">Typ tiketu</div>
+        <div class="tkt-tog" id="tktType">
+          <div class="tkt-tb sel" data-val="over15">Over 1.5</div>
+          <div class="tkt-tb" data-val="over25">Over 2.5</div>
+          <div class="tkt-tb" data-val="btts">BTTS</div>
+          <div class="tkt-tb" data-val="home">Favorit vyhrá</div>
+        </div>
+      </div>
+
+      <!-- Režim -->
+      <div class="tkt-sec">
+        <div class="tkt-sec-lbl">Analytický režim</div>
+        <div class="tkt-tog" id="tktMode">
+          <div class="tkt-tb" data-val="safe">SAFE</div>
+          <div class="tkt-tb sel" data-val="balanced">BALANCED</div>
+          <div class="tkt-tb" data-val="aggressive">AGGRESSIVE</div>
+        </div>
+      </div>
+
+      <!-- Počet zápasov -->
+      <div class="tkt-sec">
+        <div class="tkt-sec-lbl">Počet zápasov</div>
+        <div class="tkt-tog" id="tktCount">
+          <div class="tkt-tb" data-val="1">1</div>
+          <div class="tkt-tb" data-val="2">2</div>
+          <div class="tkt-tb sel" data-val="3">3</div>
+          <div class="tkt-tb" data-val="5">5</div>
+        </div>
+      </div>
+
+      <!-- Liga -->
+      <div class="tkt-sec">
+        <div class="tkt-sec-lbl">Liga</div>
+        <div class="tkt-tog" id="tktLeague">
+          <div class="tkt-tb sel" data-val="all">Všetky ligy</div>
+          <div class="tkt-tb" data-val="top">Iba top ligy</div>
+        </div>
+      </div>
+
+      <!-- Kurz -->
+      <div class="tkt-sec">
+        <div class="tkt-sec-lbl">Kurz (rozsah)</div>
+        <div class="tkt-odds-row">
+          <label>Min:</label>
+          <input class="tkt-inp" id="tktOddsMin" type="number" value="1.30" min="1.01" step="0.05"/>
+          <label>Max:</label>
+          <input class="tkt-inp" id="tktOddsMax" type="number" value="2.50" min="1.01" step="0.05"/>
+        </div>
+      </div>
+
+      <button class="tkt-gen" id="tktGenBtn" onclick="generateTicket()">⚡ GENEROVAŤ TIKET</button>
+
+      <!-- Results -->
+      <div class="tkt-result" id="tktResult" style="display:none"></div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ── 3 COLUMNS ── -->
+<div class="app">
+
+  <!-- LEFT: CONTROL -->
+  <div class="col col-left">
+    <div class="col-hdr">
+      <div class="cht">RIADIACI PANEL</div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <div class="chb" id="lBadge">VSTUP</div>
+        <button class="zoom-btn" onclick="openZoom(this.closest('.col'),'RIADIACI PANEL')" title="Celá obrazovka">⛶</button>
+      </div>
+    </div>
+    <div class="col-body">
+      <!-- LIVE / MANUAL toggle -->
+      <div class="lm-row">
+        <div class="lm-btn lm-on" id="btnManual" onclick="setLiveMode(false)">MANUAL</div>
+        <div class="lm-btn" id="btnLive" onclick="setLiveMode(true)">● LIVE</div>
+      </div>
+      <!-- Live match selector -->
+      <div class="lv-panel" id="livePanel" style="display:none">
+        <div class="fg">
+          <label>Vyber live zápas</label>
+          <select id="matchSelect" onchange="selectMatch(this.value)">
+            <option value="">— načítavam —</option>
+          </select>
+        </div>
+        <div class="lv-status" id="lvStatus">—</div>
+      </div>
+
+      <div class="fg"><label>Domáci tím</label><input type="text" id="home" placeholder="Domáci tím"/></div>
+      <div class="fg"><label>Hosťujúci tím</label><input type="text" id="away" placeholder="Hosťujúci tím"/></div>
+      <div class="fg"><label>Skóre</label>
+        <div class="srow">
+          <input type="number" id="scoreH" value="0" min="0" max="20" oninput="lu()"/>
+          <div class="ssep">:</div>
+          <input type="number" id="scoreA" value="0" min="0" max="20" oninput="lu()"/>
+        </div>
+      </div>
+      <div class="fg"><label>Minúta</label><input type="number" id="minute" value="45" min="1" max="90" oninput="lu()"/></div>
+      <div class="fg"><label>Market</label>
+        <select id="market" onchange="lu()">
+          <option value="over05">OVER 0.5 GÓLOV</option>
+          <option value="over25">OVER 2.5 GÓLOV</option>
+          <option value="btts">BTTS — OBA SKÓRUJÚ</option>
+        </select>
+      </div>
+      <div class="dvd"></div>
+      <div style="font-size:7px;letter-spacing:2px;color:var(--mut);margin-bottom:5px;text-transform:uppercase">ANALYTICKÝ REŽIM</div>
+      <div class="mrow">
+        <div class="mbtn" id="mode-safe" onclick="setMode('safe')">SAFE</div>
+        <div class="mbtn mb" id="mode-balanced" onclick="setMode('balanced')">BAL</div>
+        <div class="mbtn" id="mode-aggressive" onclick="setMode('aggressive')">AGG</div>
+      </div>
+      <button class="rbtn" id="rbtn" onclick="run()">⬡ SPUSTIŤ ANALÝZU ⬡</button>
+      <div class="lbar" id="lbar"></div>
+      <div class="tlog" id="tlog"></div>
+    </div>
+  </div>
+
+  <!-- CENTER: LIVE ANALYSIS -->
+  <div class="col col-center">
+    <div class="col-hdr">
+      <div class="cht">ŽIVÁ ANALÝZA</div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <div class="chb" id="cBadge">MONITORUJEM</div>
+        <button class="zoom-btn" onclick="openZoom(this.closest('.col'),'ŽIVÁ ANALÝZA')" title="Celá obrazovka">⛶</button>
+      </div>
+    </div>
+    <div class="col-body">
+      <div class="lp">
+        <div class="lp-row"><span class="lp-lbl">NÁHĽAD SIGNÁLU</span><span class="lp-num" id="lpNum">--</span></div>
+        <div class="lp-bg"><div class="lp-bar" id="lpBar" style="width:0%"></div></div>
+        <div class="lp-bot"><span class="smsg" id="smsg">◈ INICIALIZÁCIA...</span><span class="lvtag" id="lvtag" style="color:var(--mut);border-color:var(--bd)">—</span></div>
+      </div>
+
+      <div class="pgwrap">
+        <div class="pglbl">
+          <span class="pglbl-t">TLAK / MOMENTUM</span>
+          <span class="pglbl-v" id="pgVal">--</span>
+        </div>
+        <canvas id="pgraph" height="34" style="width:100%;display:block;"></canvas>
+      </div>
+
+      <div class="slg"><div class="slh"><span class="sll">xG (celkový)</span><div class="slr"><span class="slv" id="v-xg">1.42</span><span class="sllvl" id="l-xg"></span></div></div><input type="range" id="s-xg" min="0" max="500" value="142" oninput="sv('xg',this.value);lu()"/></div>
+      <div class="slg"><div class="slh"><span class="sll">Strely (celkom)</span><div class="slr"><span class="slv" id="v-shots">12</span><span class="sllvl" id="l-shots"></span></div></div><input type="range" id="s-shots" min="0" max="40" value="12" oninput="sv('shots',this.value);lu()"/></div>
+      <div class="slg"><div class="slh"><span class="sll">Nebezpečné útoky</span><div class="slr"><span class="slv" id="v-attacks">28</span><span class="sllvl" id="l-attacks"></span></div></div><input type="range" id="s-attacks" min="0" max="80" value="28" oninput="sv('attacks',this.value);lu()"/></div>
+      <div class="slg"><div class="slh"><span class="sll">Rohy (celkom)</span><div class="slr"><span class="slv" id="v-corners">5</span><span class="sllvl" id="l-corners"></span></div></div><input type="range" id="s-corners" min="0" max="20" value="5" oninput="sv('corners',this.value);lu()"/></div>
+      <div class="slg"><div class="slh"><span class="sll">Possession (%)</span><div class="slr"><span class="slv" id="v-poss">52</span><span class="sllvl" id="l-poss"></span></div></div><input type="range" id="s-poss" min="30" max="70" value="52" oninput="sv('poss',this.value);lu()"/></div>
+      <div class="slg"><div class="slh"><span class="sll">Tlak (intenzita)</span><div class="slr"><span class="slv" id="v-pressure">6</span><span class="sllvl" id="l-pressure"></span></div></div><input type="range" id="s-pressure" min="1" max="10" value="6" oninput="sv('pressure',this.value);lu()"/></div>
+
+      <div class="lc-t">// PODMIENKY — NÁHĽAD</div>
+      <div class="lc-g" id="lcGrid"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT: AI RESULT TERMINAL -->
+  <div class="col col-right" id="colRight">
+    <div class="col-hdr">
+      <div class="cht">AI VÝSLEDKOVÝ TERMINÁL</div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <div class="chb" id="rBadge">POHOTOVOSŤ</div>
+        <button class="zoom-btn" onclick="openZoom(this.closest('.col'),'AI VÝSLEDKOVÝ TERMINÁL')" title="Celá obrazovka">⛶</button>
+      </div>
+    </div>
+    <div class="col-body">
+
+      <!-- AI Terminal -->
+      <div class="ait">
+        <div class="aith">
+          <div class="ai-id">APEX-AI v2.4</div>
+          <div class="ai-st sb" id="aiSt">◆ POHOTOVOSŤ</div>
+          <div class="ai-dots"><span></span><span></span><span></span></div>
+        </div>
+
+        <!-- Hexagonal cyber operator + message -->
+        <div class="ai-body-row">
+          <!-- Minimalist hex robot SVG -->
+          <div class="ai-svg-col">
+            <svg viewBox="0 0 48 58" fill="none" width="46" height="55">
+              <!-- Antenna -->
+              <line x1="24" y1="0" x2="24" y2="9" stroke="#00fff7" stroke-width="1.1"/>
+              <circle cx="24" cy="2" r="1.7" fill="#00fff7" style="animation:hexBlink .9s infinite"/>
+              <!-- Hex head (flat-top) -->
+              <polygon points="12,9 36,9 48,28 36,49 12,49 0,28"
+                fill="#020c10" stroke="#00fff7" stroke-width="1.1"/>
+              <!-- Top edge accent -->
+              <line x1="15" y1="9" x2="33" y2="9" stroke="#00fff7" stroke-width="2" opacity=".35"/>
+              <!-- Eye housing -->
+              <rect x="9" y="20" width="30" height="16" rx="1.2"
+                fill="#010b0f" stroke="#00fff7" stroke-width=".9"/>
+              <!-- Eye ambient fill -->
+              <rect x="11" y="22" width="26" height="12" rx=".5" fill="#00fff7" opacity=".05"/>
+              <!-- Scanning beam -->
+              <rect x="11" y="25" width="26" height="2" rx="1" fill="#00fff7" opacity=".92"
+                style="animation:hexScan 2s ease-in-out infinite"/>
+              <!-- Eye corner marks -->
+              <line x1="9" y1="22" x2="14" y2="22" stroke="#00fff7" stroke-width=".9" opacity=".55"/>
+              <line x1="9" y1="34" x2="14" y2="34" stroke="#00fff7" stroke-width=".9" opacity=".55"/>
+              <line x1="34" y1="22" x2="39" y2="22" stroke="#00fff7" stroke-width=".9" opacity=".55"/>
+              <line x1="34" y1="34" x2="39" y2="34" stroke="#00fff7" stroke-width=".9" opacity=".55"/>
+              <!-- Chin signal bars -->
+              <rect x="13" y="41" width="22" height="6" rx=".5" fill="#010b0f" stroke="#00fff7" stroke-width=".7"/>
+              <rect x="15" y="43.5" width="3" height="1.5" rx=".3" fill="#00fff7" style="animation:hexSig 1.1s .0s infinite alternate"/>
+              <rect x="20" y="43" width="3" height="2.5" rx=".3" fill="#00fff7" style="animation:hexSig 1.1s .2s infinite alternate"/>
+              <rect x="25" y="43.5" width="3" height="1.5" rx=".3" fill="#00fff7" style="animation:hexSig 1.1s .4s infinite alternate"/>
+              <rect x="30" y="43" width="3" height="2.5" rx=".3" fill="#00fff7" style="animation:hexSig 1.1s .2s infinite alternate"/>
+              <!-- Side circuit details -->
+              <line x1="0" y1="25" x2="5" y2="25" stroke="#00fff7" stroke-width=".9" opacity=".32"/>
+              <line x1="5" y1="25" x2="5" y2="31" stroke="#00fff7" stroke-width=".9" opacity=".2"/>
+              <line x1="43" y1="25" x2="48" y2="25" stroke="#00fff7" stroke-width=".9" opacity=".32"/>
+              <line x1="43" y1="25" x2="43" y2="31" stroke="#00fff7" stroke-width=".9" opacity=".2"/>
+            </svg>
+          </div>
+          <!-- Message -->
+          <div class="ai-msg-col">
+            <div class="aip">apex-ai:~$ <span id="aiMode">standby</span></div>
+            <div class="aio"><span class="aipc">►</span><span id="aiMsg">Systém pripravený...</span><span class="aic"></span></div>
+          </div>
+        </div>
+        <div class="ai-foot">
+          <div class="ai-sg"><span class="sdt sdt-g" id="dot1"></span>NEURAL</div>
+          <div class="ai-sg"><span class="sdt sdt-a" id="dot2"></span>DÁTA</div>
+          <div class="ai-sg"><span class="sdt sdt-g" id="dot3"></span>ZÁMOK</div>
+        </div>
+      </div>
+
+      <!-- Signal Score -->
+      <div class="snum-b">
+        <div class="snum" id="snum">--</div>
+        <div class="slbl">SILA SIGNÁLU / 100</div>
+      </div>
+
+      <!-- Confidence -->
+      <div class="cf">
+        <div class="cfrow"><span class="cfl">SPOĽAHLIVOSŤ</span><span class="cfp" id="cfp">--%</span></div>
+        <div class="cfbg"><div class="cfbar" id="cfbar" style="width:0%"></div></div>
+      </div>
+
+      <!-- Prob badge -->
+      <div class="pbadge" id="pbadge"><span class="pb-dot"></span><span id="pbTxt">MEDIUM</span></div>
+
+      <!-- Verdict -->
+      <div class="vbox vs-sb" id="vbox">
+        <div class="vtxt" id="vtxt">POHOTOVOSŤ</div>
+        <div class="vsub" id="vsub">Zadaj dáta a spusti analýzu</div>
+      </div>
+
+      <!-- Stake row -->
+      <div class="strow" id="strow">
+        <div class="stchip"><div class="stl">Stávka</div><div class="stv" id="stakeV">—</div></div>
+        <div class="stchip"><div class="stl">Riziko</div><div class="stv" id="riskV">—</div></div>
+        <div class="stchip"><div class="stl">Market</div><div class="stv" id="mktV">—</div></div>
+      </div>
+
+      <!-- Score Breakdown -->
+      <div class="bdwrap" id="bdwrap">
+        <div class="bdt-hdr">// ROZKLAD SKÓRE</div>
+        <div class="bd-scroll"><div id="bdlist"></div></div>
+        <div class="bd-sum">
+          <span class="bd-sum-l">CELKOVÉ SKÓRE</span>
+          <span class="bd-sum-v" id="bdtotal">0 / 100</span>
+        </div>
+      </div>
+
+      <!-- AI Live Log -->
+      <div class="ai-log-wrap" id="aiLogWrap">
+        <div class="ai-log-hdr">// AI MONITOR LOG</div>
+        <div class="ai-log-body" id="aiLogBody">
+          <div class="ai-log-line"><span class="ts">--:--</span>Systém pripravený. Čakám na dáta.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<!-- ── HISTORY BAR ── -->
+<div id="hbar">
+  <div class="hb-hdr" onclick="toggleHist()">
+    <div class="hb-ttl">HISTÓRIA SIGNÁLOV</div>
+    <div class="hb-cnts">
+      <span class="hcc-e">E:<b id="cntE">0</b></span>
+      <span class="hcc-w">W:<b id="cntW">0</b></span>
+      <span class="hcc-n">N:<b id="cntN">0</b></span>
+    </div>
+    <div class="hb-roi-inline" id="hdrRoi">·&nbsp;ROI:&nbsp;<span id="hdrRoiVal">—</span>&nbsp;·&nbsp;P/L:&nbsp;<span id="hdrPl">—</span></div>
+    <div class="hb-sp"></div>
+    <button class="hb-clr" onclick="event.stopPropagation();clearHistory()">VYMAZAŤ</button>
+    <span class="hb-tog">▲</span>
+  </div>
+  <!-- Performance panel (visible when open) -->
+  <div class="hb-perf" id="hbPerf">
+    <div class="perf-blk">
+      <div class="pstat"><span class="pstat-v" id="pTotal">0</span><span class="pstat-l">STÁVKY</span></div>
+      <div class="pstat"><span class="pstat-v" style="color:var(--g)" id="pWins">0</span><span class="pstat-l">VÝHRY</span></div>
+      <div class="pstat"><span class="pstat-v" style="color:var(--r)" id="pLosses">0</span><span class="pstat-l">PREHRY</span></div>
+      <div class="pstat"><span class="pstat-v" id="pWR">—</span><span class="pstat-l">ÚSPEŠNOSŤ</span></div>
+      <div class="perf-sep"></div>
+      <div class="pstat"><span class="pstat-v" id="pStaked">0€</span><span class="pstat-l">VSADENÉ</span></div>
+      <div class="pstat big" id="pPlStat"><span class="pstat-v" id="pPL">0€</span><span class="pstat-l">ZISK/STRATA</span></div>
+      <div class="pstat big" id="pRoiStat"><span class="pstat-v" id="pROI">—%</span><span class="pstat-l">ROI</span></div>
+    </div>
+  </div>
+  <div class="hb-cards" id="hCards"><div class="h-empty">[ žiadne záznamy ]</div></div>
+</div>
+
+<script>
+// ── CONSTANTS ──
+const MKT={over05:'OVER 0.5',over25:'OVER 2.5',btts:'BTTS'};
+const LS='apex_v2';
+let mode='balanced';
+
+// ── CLOCK ──
+setInterval(()=>{document.getElementById('tbClk').textContent=new Date().toTimeString().slice(0,8);},1000);
+document.getElementById('tbClk').textContent=new Date().toTimeString().slice(0,8);
+
+// ── AMBIENT SCAN ──
+document.getElementById('ambScan').classList.add('active');
+
+// ── TOPBAR ROTATION (standby alive) ──
+const TB_SB=['NEURAL ENGINE ONLINE','MONITORUJEM LIVE DÁTA','SKENUJEM SIGNÁLY','AI ANALÝZA PRIPRAVENÁ','LIVE DÁTOVÝ TOK AKTÍVNY'];
+let tbIdx=0,tbTimer=null;
+function startTbRotation(){
+  tbTimer=setInterval(()=>{
+    tbIdx=(tbIdx+1)%TB_SB.length;
+    const el=document.getElementById('tbAi');
+    if(el.className.includes('busy'))return;
+    el.textContent=TB_SB[tbIdx];
+  },5000);
+}
+function stopTbRotation(){if(tbTimer)clearInterval(tbTimer);}
+function setTbAi(txt,cls){const el=document.getElementById('tbAi');el.textContent=txt;el.className='tb-ai '+cls;}
+
+// ── SLIDER DISPLAY + FILL ──
+function sv(k,v){
+  document.getElementById('v-'+k).textContent=k==='xg'?(v/100).toFixed(2):v;
+  const el=document.getElementById('s-'+k);
+  const pct=((v-el.min)/(el.max-el.min))*100;
+  el.style.background=`linear-gradient(to right,var(--cd) ${pct}%,var(--bg4) ${pct}%)`;
+}
+function initSliders(){
+  [['xg','s-xg'],['shots','s-shots'],['attacks','s-attacks'],
+   ['corners','s-corners'],['poss','s-poss'],['pressure','s-pressure']].forEach(([k,id])=>sv(k,document.getElementById(id).value));
+}
+
+// ── LEVEL TAGS ──
+function setLvl(id,pct){
+  const el=document.getElementById(id);if(!el)return;
+  if(pct>=.65){el.textContent='HIGH';el.className='sllvl lvl-h';}
+  else if(pct>=.35){el.textContent='MED';el.className='sllvl lvl-m';}
+  else{el.textContent='LOW';el.className='sllvl lvl-l';}
+}
+
+// ── MODE ──
+function setMode(m){
+  mode=m;
+  ['safe','balanced','aggressive'].forEach(x=>{
+    const c=x==='safe'?'ms':x==='balanced'?'mb':'ma';
+    document.getElementById('mode-'+x).className='mbtn'+(x===m?' '+c:'');
+  });
+  lu();
+}
+
+// ── SCORE ENGINE v2 ──
+function calcScore(){
+  const minute  =parseInt(document.getElementById('minute').value)||45;
+  const sH      =parseInt(document.getElementById('scoreH').value)||0;
+  const sA      =parseInt(document.getElementById('scoreA').value)||0;
+  const market  =document.getElementById('market').value;
+  const total   =sH+sA;
+
+  // ── NORMALIZATION (cap raw values before scoring) ──
+  const shots   =Math.min(parseInt(document.getElementById('s-shots').value)||0,   25);
+  const attacks =Math.min(parseInt(document.getElementById('s-attacks').value)||0, 120);
+  const corners =Math.min(parseInt(document.getElementById('s-corners').value)||0,  15);
+  const poss    =parseInt(document.getElementById('s-poss').value)||50;
+  const xg      =parseInt(document.getElementById('s-xg').value)/100;
+  const pressure=Math.min(Math.round(attacks/18),10)||parseInt(document.getElementById('s-pressure').value)||1;
+  let sc=0; const bd=[];
+
+  function add(label,pts,ok){ if(ok){sc+=pts;bd.push({l:label,p:'+'+pts,ok:true});}else{bd.push({l:label,p:'0',ok:false});} }
+
+  if(market==='over05'){
+    // Minute
+    if(minute>=60&&minute<=78)                                     add('Minúta 60–78',15,true);
+    else if((minute>=50&&minute<=59)||(minute>=79&&minute<=85))    add('Minúta 50–59 / 79–85',8,true);
+    else                                                            add('Minúta mimo okna',0,false);
+    // Score
+    if((sH===0&&sA===0)||(sH===1&&sA===0)||(sH===0&&sA===1)||(sH===1&&sA===1)) add('Skóre 0:0/1:0/0:1/1:1',15,true);
+    else if((sH===2&&sA===1)||(sH===1&&sA===2))                   add('Skóre 2:1 / 1:2',10,true);
+    else                                                            add('Skóre nevyhovuje',0,false);
+    // xG
+    if(xg>=2.0)      add('xG ≥ 2.0',20,true);
+    else if(xg>=1.6) add('xG ≥ 1.6',15,true);
+    else if(xg>=1.2) add('xG ≥ 1.2',8,true);
+    else             add('xG < 1.2',0,false);
+    // Shots
+    if(shots>=6)      add('Strely ≥ 6',15,true);
+    else if(shots>=4) add('Strely 4–5',10,true);
+    else if(shots>=2) add('Strely 2–3',5,true);
+    else              add('Strely < 2',0,false);
+    // Attacks
+    if(attacks>=50)      add('Útoky ≥ 50',15,true);
+    else if(attacks>=35) add('Útoky 35–49',10,true);
+    else if(attacks>=20) add('Útoky 20–34',5,true);
+    else                 add('Útoky < 20',0,false);
+    // Pressure
+    if(pressure>=8)      add('Tlak 8–10',15,true);
+    else if(pressure>=6) add('Tlak 6–7',10,true);
+    else if(pressure>=4) add('Tlak 4–5',5,true);
+    else                 add('Tlak < 4',0,false);
+    // Corners
+    if(corners>=8)      add('Rohy ≥ 8',5,true);
+    else if(corners>=5) add('Rohy 5–7',3,true);
+    else                add('Rohy < 5',0,false);
+
+  } else if(market==='over25'){
+    // Goals
+    if(total>=2)      add('Góly: 2+',25,true);
+    else if(total===1) add('Góly: 1',15,true);
+    else              add('Góly: 0',5,true); // still 5 pts
+    // Minute
+    if(minute>=30&&minute<=70)      add('Minúta 30–70',15,true);
+    else if(minute>=71&&minute<=80) add('Minúta 71–80',8,true);
+    else                            add('Minúta mimo okna',0,false);
+    // xG
+    if(xg>=2.5)      add('xG ≥ 2.5',20,true);
+    else if(xg>=2.0) add('xG ≥ 2.0',15,true);
+    else if(xg>=1.5) add('xG ≥ 1.5',8,true);
+    else             add('xG < 1.5',0,false);
+    // Shots
+    if(shots>=7)      add('Strely ≥ 7',15,true);
+    else if(shots>=5) add('Strely 5–6',10,true);
+    else if(shots>=3) add('Strely 3–4',5,true);
+    else              add('Strely < 3',0,false);
+    // Pressure
+    if(pressure>=8)      add('Tlak 8–10',10,true);
+    else if(pressure>=6) add('Tlak 6–7',7,true);
+    else if(pressure>=4) add('Tlak 4–5',3,true);
+    else                 add('Tlak < 4',0,false);
+    // Attacks
+    if(attacks>=55)      add('Útoky ≥ 55',10,true);
+    else if(attacks>=35) add('Útoky 35–54',7,true);
+    else if(attacks>=20) add('Útoky 20–34',3,true);
+    else                 add('Útoky < 20',0,false);
+    // Corners
+    if(corners>=8)      add('Rohy ≥ 8',5,true);
+    else if(corners>=5) add('Rohy 5–7',3,true);
+    else                add('Rohy < 5',0,false);
+
+  } else {
+    // BTTS
+    // Score
+    if((sH===1&&sA===0)||(sH===0&&sA===1))                        add('Skóre 1:0 / 0:1',20,true);
+    else if(sH===0&&sA===0)                                        add('Skóre 0:0',15,true);
+    else if((sH===2&&sA===0)||(sH===0&&sA===2))                   add('Skóre 2:0 / 0:2',8,true);
+    else if(sH>0&&sA>0)                                            add('Oba skórovali',10,true);
+    else                                                            add('Skóre nevyhovuje',0,false);
+    // Minute
+    if(minute>=25&&minute<=70)      add('Minúta 25–70',15,true);
+    else if(minute>=71&&minute<=80) add('Minúta 71–80',8,true);
+    else                            add('Minúta mimo okna',0,false);
+    // xG
+    if(xg>=2.0)      add('xG ≥ 2.0',15,true);
+    else if(xg>=1.5) add('xG ≥ 1.5',10,true);
+    else if(xg>=1.0) add('xG ≥ 1.0',5,true);
+    else             add('xG < 1.0',0,false);
+    // Shots (proxy for both teams)
+    if(shots>=4)      add('Strely: oba ≥ 2',15,true);
+    else if(shots>=3) add('Strely: 1 tím ≥ 2',8,true);
+    else              add('Strely nedostatočné',0,false);
+    // Attacks
+    if(attacks>=50)      add('Útoky ≥ 50',15,true);
+    else if(attacks>=35) add('Útoky ≥ 35',10,true);
+    else                 add('Útoky < 35',0,false);
+    // Pressure
+    if(pressure>=8)      add('Tlak 8–10',10,true);
+    else if(pressure>=6) add('Tlak 6–7',7,true);
+    else if(pressure>=4) add('Tlak 4–5',3,true);
+    else                 add('Tlak < 4',0,false);
+    // Possession
+    if(poss>=45&&poss<=55)         add('Possession 45–55%',10,true);
+    else if(poss>=40&&poss<=60)    add('Possession 40–60%',5,true);
+    else                           add('Possession mimo 40–60%',0,false);
+  }
+
+  sc=Math.min(100,Math.max(0,sc));
+  return{score:sc,breakdown:bd,minute,sH,sA,market,shots,attacks,corners,poss,xg,pressure,total};
+}
+
+function getVerdict(sc){
+  if(sc>=70) return'VSTÚPIŤ';
+  if(sc>=45) return'POČKAŤ';
+  return'NESTÁVKOVAŤ';
+}
+
+function getStake(sc,m){
+  if(sc<45) return'—';
+  if(sc>=70){
+    if(m==='safe')      return'1–2%';
+    if(m==='balanced')  return'2–3%';
+    return'3–5%';
+  }
+  // POČKAŤ 45-69
+  if(m==='safe')      return'—';
+  if(m==='balanced')  return'1%';
+  return'1–2%';
+}
+
+// ── LIVE CONDITIONS (center panel preview) ──
+function getConds(d){
+  const{market:m,total,sH,sA,shots,attacks,corners,poss,xg,pressure,minute}=d;
+  if(m==='over05') return[
+    {t:'Minúta 60–78',   p:minute>=60&&minute<=78},
+    {t:'xG ≥ 1.2',       p:xg>=1.2},
+    {t:'Strely ≥ 4',     p:shots>=4},
+    {t:'Útoky ≥ 35',     p:attacks>=35},
+    {t:'Tlak ≥ 6/10',    p:pressure>=6},
+    {t:'Skóre OK',        p:(sH<=1&&sA<=1&&total<=2)||((sH===2&&sA===1)||(sH===1&&sA===2))},
+  ];
+  if(m==='over25') return[
+    {t:'Góly ≥ 1',        p:total>=1},
+    {t:'Minúta 30–70',   p:minute>=30&&minute<=70},
+    {t:'xG ≥ 1.5',       p:xg>=1.5},
+    {t:'Strely ≥ 5',     p:shots>=5},
+    {t:'Tlak ≥ 6/10',    p:pressure>=6},
+    {t:'Útoky ≥ 35',     p:attacks>=35},
+  ];
+  return[
+    {t:'Minúta 25–70',   p:minute>=25&&minute<=70},
+    {t:'xG ≥ 1.0',       p:xg>=1.0},
+    {t:'Possession 40–60%', p:poss>=40&&poss<=60},
+    {t:'Strely ≥ 3',     p:shots>=3},
+    {t:'Útoky ≥ 35',     p:attacks>=35},
+    {t:'Tlak ≥ 6/10',    p:pressure>=6},
+  ];
+}
+
+// ── LIVE UPDATE ──
+const SCAN_MSGS=['◈ SKENUJEM xG INDEX...','◈ ANALÝZA TLAKU...','◈ VYHODNOCUJEM PODMIENKY...','◈ KALKULUJEM EDGE...','◈ MONITORING LIVE DATA...','◈ NEURAL FEED ACTIVE...','◈ ANALYZUJEM DÁTA...','◈ EDGE DETECTION...'];
+let sIdx=0;
+function rotateScan(){document.getElementById('smsg').textContent=SCAN_MSGS[sIdx=(sIdx+1)%SCAN_MSGS.length];}
+setInterval(rotateScan,2600);
+
+function lu(){
+  const d=calcScore();const v=getVerdict(d.score);
+  const col=v==='VSTÚPIŤ'?'var(--g)':v==='POČKAŤ'?'var(--a)':'var(--r)';
+  setLvl('l-xg',d.xg/5);setLvl('l-shots',d.shots/40);setLvl('l-attacks',d.attacks/80);
+  setLvl('l-corners',d.corners/20);setLvl('l-poss',Math.min(1,Math.max(0,1-Math.abs(d.poss-50)/20)));setLvl('l-pressure',(d.pressure-1)/9);
+  document.getElementById('lpNum').textContent=d.score;document.getElementById('lpNum').style.color=col;
+  document.getElementById('lpBar').style.width=d.score+'%';document.getElementById('lpBar').style.background=col;
+  const vt=document.getElementById('lvtag');
+  vt.textContent=v==='VSTÚPIŤ'?'ENTER':v==='POČKAŤ'?'WAIT':'NO BET';vt.style.color=col;vt.style.borderColor=col;
+  // live conds
+  const g=document.getElementById('lcGrid');const conds=getConds(d);
+  if(g.children.length!==conds.length){g.innerHTML='';conds.forEach(c=>{const div=document.createElement('div');div.className='lci '+(c.p?'pass':'fail');div.innerHTML=`<span class="lci-i">${c.p?'✓':'✗'}</span><span class="lci-t">${c.t}</span>`;g.appendChild(div);});}
+  else[...g.children].forEach((el,i)=>{el.className='lci '+(conds[i].p?'pass':'fail');el.querySelector('.lci-i').textContent=conds[i].p?'✓':'✗';});
+  updateGraph(d.score);
+  _lastCalcData=d;
+}
+
+// ── AI MESSAGES ──
+const AI={
+  vstup:['Vysoké xG a tlak potvrdzujú edge.','Signal potvrdený. Podmienky splnené.','Edge detekovaný. Vstup odporúčaný.'],
+  cakaj:['Momentum rastie, signal ešte nie je potvrdený.','Čiastočné podmienky. Monitorujem zápas.','Tlak sa buduje. Čakaj na potvrdenie.'],
+  nie:['Riziko prevyšuje potenciál. Vynechaj.','Nízky edge. Signal zamietnutý.','Nedostatočné podmienky. Ochrana kapitálu.'],
+};
+const SB_MSGS=['Systém pripravený...','Monitorujem signály...','Neural engine aktívny...','Čakám na analýzu...'];
+let sbIdx=0,sbTimer=null,aiTimer=null;
+function typeAI(txt){
+  if(aiTimer)clearInterval(aiTimer);
+  const el=document.getElementById('aiMsg');let i=0;el.textContent='';
+  aiTimer=setInterval(()=>{el.textContent=txt.slice(0,i++);if(i>txt.length)clearInterval(aiTimer);},14);
+}
+function startSB(){sbTimer=setInterval(()=>{sbIdx=(sbIdx+1)%SB_MSGS.length;typeAI(SB_MSGS[sbIdx]);},4500);}
+function stopSB(){if(sbTimer)clearInterval(sbTimer);}
+function setAiState(state,label){
+  const el=document.getElementById('aiSt');el.textContent='◆ '+label;
+  el.className='ai-st '+state;
+}
+
+// ── TERMINAL LOG ──
+const LOG=[{t:'[SYS] INICIALIZÁCIA NEURAL ENGINE...',c:''},{t:'[DAT] NAČÍTAVAM VSTUPNÉ DÁTA...',c:''},{t:'[xG]  VYHODNOCUJEM EXPECTED GOALS...',c:''},{t:'[PRE] ANALYZUJEM TLAKOVÝ INDEX...',c:''},{t:'[MKT] KONTROLUJEM TRHOVÉ PODMIENKY...',c:''},{t:'[SIG] GENERUJEM SIGNAL SCORE...',c:'tl-hi'},{t:'[OK]  ANALÝZA KOMPLETNÁ.',c:'tl-ok'}];
+function runLog(cb){
+  const log=document.getElementById('tlog');log.innerHTML='';log.className='tlog on';
+  LOG.forEach((s,i)=>{const d=document.createElement('div');d.className='tl '+(s.c||'');d.textContent=s.t;log.appendChild(d);setTimeout(()=>d.classList.add('show'),(i+1)*200);});
+  setTimeout(()=>{log.className='tlog';if(cb)cb();},LOG.length*200+280);
+}
+
+// ── HISTORY ──
+function loadSigs(){try{return JSON.parse(localStorage.getItem(LS)||'[]');}catch{return[];}}
+function saveSigs(a){try{localStorage.setItem(LS,JSON.stringify(a.slice(0,60)));}catch{}}
+let sigs=loadSigs();
+const MAX_SIGNALS=300;
+
+function refreshCounts(){
+  let e=0,w=0,n=0;
+  sigs.forEach(s=>{if(s.v==='VSTÚPIŤ')e++;else if(s.v==='POČKAŤ')w++;else n++;});
+  document.getElementById('cntE').textContent=e;
+  document.getElementById('cntW').textContent=w;
+  document.getElementById('cntN').textContent=n;
+  document.getElementById('tbSig').textContent=sigs.length;
+  // Update inline ROI in header
+  const tracked=sigs.filter(s=>s.result&&s.result!=='NOT_SET');
+  const nonVoid=tracked.filter(s=>s.result!=='VOID');
+  const staked=nonVoid.reduce((a,s)=>a+(s.stakeAmt||0),0);
+  const profit=tracked.reduce((a,s)=>a+(s.profit||0),0);
+  const roi=staked>0?((profit/staked)*100).toFixed(1):null;
+  const roiEl=document.getElementById('hdrRoiVal');
+  const plEl=document.getElementById('hdrPl');
+  if(roiEl){
+    const roiCls=profit>0?'roi-pos':profit<0?'roi-neg':'';
+    roiEl.className=roiCls;
+    roiEl.textContent=roi?(profit>=0?'+':'')+roi+'%':'—';
+  }
+  if(plEl){
+    plEl.className=profit>0?'roi-pos':profit<0?'roi-neg':'';
+    plEl.textContent=profit!==0?(profit>0?'+':'')+profit.toFixed(2)+'€':'—';
+  }
+}
+
+function renderHistory(){
+  const c=document.getElementById('hCards');
+  if(!sigs.length){c.innerHTML='<div class="h-empty">[ žiadne záznamy — spusti analýzu ]</div>';return;}
+  c.innerHTML='';
+  sigs.slice(0,50).forEach((s,i)=>{
+    const card=document.createElement('div');
+    const vCls=s.v==='VSTÚPIŤ'?'hv':s.v==='POČKAŤ'?'ha':'hr';
+    const bc  =s.v==='VSTÚPIŤ'?'bv':s.v==='POČKAŤ'?'ba':'br';
+    const col =s.v==='VSTÚPIŤ'?'var(--g)':s.v==='POČKAŤ'?'var(--a)':'var(--r)';
+    const res =s.result||'NOT_SET';
+    // Left-border glow by ROI result
+    const roiCls=res==='WIN'?'roi-win':res==='LOSS'?'roi-loss':res==='VOID'?'roi-void':'roi-ns';
+    const wa=res==='WIN'?'act':'',la=res==='LOSS'?'act':'',xa=res==='VOID'?'act':'';
+    let plHtml='';
+    if(res!=='NOT_SET'&&s.profit!=null){
+      const p=s.profit;
+      plHtml=`<span class="hc-pl ${p>0?'pos':p<0?'neg':'zero'}">${p>0?'+':''}${p.toFixed(2)}€</span>`;
+    }
+    card.className=`hcard ${vCls} ${roiCls}`;
+    card.innerHTML=`
+      <button class="hc-del" onclick="deleteSig(${i})" title="Vymazať">✕</button>
+      <div class="hc-m">${s.home||'?'} vs ${s.away||'?'}</div>
+      <div class="hc-meta">${s.mkt} · ${s.sH}:${s.sA} · ${s.min}' · ${(s.mode||'bal').toUpperCase()} · ${s.time}</div>
+      <div class="hc-row" style="margin-bottom:4px">
+        <span class="hc-sc" style="color:${col}">${s.sig}</span>
+        <span class="hc-b ${bc}">${s.v}</span>
+      </div>
+      <div class="hc-roi">
+        <input class="hc-inp" id="sa${i}" type="number" placeholder="Stake€" value="${s.stakeAmt||''}" min="0" step="0.5" onblur="saveField(${i})"/>
+        <input class="hc-inp" id="od${i}" type="number" placeholder="Odds" value="${s.odds||''}" min="1.01" step="0.05" onblur="saveField(${i})"/>
+        <button class="hcbtn w ${wa}" onclick="setResult(${i},'WIN')">WIN</button>
+        <button class="hcbtn l ${la}" onclick="setResult(${i},'LOSS')">LOSS</button>
+        <button class="hcbtn x ${xa}" onclick="setResult(${i},'VOID')">VOID</button>
+        ${plHtml}
+      </div>
+      <input class="hc-note-i" id="nt${i}" placeholder="poznámka..." value="${(s.note||'').replace(/"/g,'&quot;')}" onblur="saveField(${i})"/>`;
+    c.appendChild(card);
+  });
+}
+
+function clearHistory(){
+  // Custom confirm dialog
+  const ok=confirm('Naozaj chceš vymazať všetky signály?\nTáto akcia je nevratná.');
+  if(!ok)return;
+  sigs=[];saveSigs(sigs);refreshCounts();renderHistory();renderPerf();
+}
+
+function deleteSig(i){
+  sigs.splice(i,1);
+  saveSigs(sigs);refreshCounts();renderHistory();renderPerf();
+}
+
+function addSig(s){
+  sigs.unshift({...s,stakeAmt:0,odds:0,result:'NOT_SET',profit:0,note:''});
+  // Auto-limit 300
+  if(sigs.length>MAX_SIGNALS) sigs=sigs.slice(0,MAX_SIGNALS);
+  saveSigs(sigs);refreshCounts();renderHistory();renderPerf();
+}
+
+function toggleHist(){
+  document.getElementById('hbar').classList.toggle('open');
+}
+
+// ── ROI: Save field from card input ──
+function saveField(i){
+  if(!sigs[i])return;
+  const sa=document.getElementById('sa'+i);const od=document.getElementById('od'+i);const nt=document.getElementById('nt'+i);
+  if(sa)sigs[i].stakeAmt=parseFloat(sa.value)||0;
+  if(od)sigs[i].odds=parseFloat(od.value)||0;
+  if(nt)sigs[i].note=nt.value||'';
+  saveSigs(sigs);renderPerf();
+}
+
+// ── ROI: Set WIN/LOSS/VOID ──
+function setResult(i,res){
+  if(!sigs[i])return;
+  const sa=document.getElementById('sa'+i);const od=document.getElementById('od'+i);const nt=document.getElementById('nt'+i);
+  const stk=parseFloat(sa?.value)||sigs[i].stakeAmt||0;
+  const odd=parseFloat(od?.value)||sigs[i].odds||0;
+  const note=nt?.value||sigs[i].note||'';
+  sigs[i].stakeAmt=stk;sigs[i].odds=odd;sigs[i].note=note;sigs[i].result=res;
+  if(res==='WIN'&&stk>0&&odd>1) sigs[i].profit=parseFloat((stk*(odd-1)).toFixed(2));
+  else if(res==='LOSS'&&stk>0)  sigs[i].profit=parseFloat((-stk).toFixed(2));
+  else                           sigs[i].profit=0;
+  saveSigs(sigs);renderHistory();renderPerf();
+}
+
+// ── ROI: Performance panel ──
+function renderPerf(){
+  const tracked=sigs.filter(s=>s.result&&s.result!=='NOT_SET');
+  const wins=tracked.filter(s=>s.result==='WIN').length;
+  const losses=tracked.filter(s=>s.result==='LOSS').length;
+  const nonVoid=tracked.filter(s=>s.result!=='VOID');
+  const staked=nonVoid.reduce((a,s)=>a+(s.stakeAmt||0),0);
+  const profit=tracked.reduce((a,s)=>a+(s.profit||0),0);
+  const wr=(wins+losses)>0?((wins/(wins+losses))*100).toFixed(1):null;
+  const roi=staked>0?((profit/staked)*100).toFixed(1):null;
+  const plCls=profit>0?'pos':profit<0?'neg':'';
+  const roiCls=profit>0?'pos':profit<0?'neg':'';
+  const set=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  set('pTotal',tracked.length);
+  set('pWins',wins);set('pLosses',losses);
+  set('pWR',wr?wr+'%':'—');
+  set('pStaked',staked>0?staked.toFixed(2)+'€':'0€');
+  set('pPL',(profit>=0?'+':'')+profit.toFixed(2)+'€');
+  set('pROI',roi?(profit>=0?'+':'')+roi+'%':'—');
+  const plStat=document.getElementById('pPlStat');
+  const roiStat=document.getElementById('pRoiStat');
+  if(plStat){plStat.className='pstat big '+(plCls);}
+  if(roiStat){roiStat.className='pstat big '+(roiCls);}
+  // Sync inline header ROI (refreshCounts handles it)
+  refreshCounts();
+}
+
+// ── MAIN ANALYSIS ──
+function run(){
+  const home=document.getElementById('home').value.trim()||'Domáci';
+  const away=document.getElementById('away').value.trim()||'Hosťujúci';
+  const btn=document.getElementById('rbtn');
+  const bar=document.getElementById('lbar');
+  const scan=document.getElementById('pgScan');
+  const colR=document.getElementById('colRight');
+
+  stopSB();stopTbRotation();stopStandbyRot();
+  deactivateSignalLock();
+  btn.textContent='⬡ ANALYZUJEM... ⬡';btn.classList.add('busy');
+  bar.className='lbar on';
+  setTbAi('ANALYZUJEM...','busy');
+  setAiState('an','ANALYZUJEM');
+  document.getElementById('cBadge').textContent='SKENUJEM';
+  scan.className='';void scan.offsetWidth;scan.className='run';
+
+  runLog(()=>{
+    bar.className='lbar';btn.textContent='⬡ SPUSTIŤ ANALÝZU ⬡';btn.classList.remove('busy');scan.className='';
+
+    const d=calcScore();
+    const verdict=getVerdict(d.score);
+    const stake=getStake(d.score,mode);
+    const hexcol=verdict==='VSTÚPIŤ'?'#00ff88':verdict==='POČKAŤ'?'#ffb300':'#ff2d55';
+    const cssCol=verdict==='VSTÚPIŤ'?'var(--g)':verdict==='POČKAŤ'?'var(--a)':'var(--r)';
+
+    // SIGNAL LOCK or other verdict
+    if(verdict==='VSTÚPIŤ'){
+      document.querySelector('.col-center').style.borderRight='1px solid rgba(0,255,136,.5)';
+      activateSignalLock();
+      setAiState('ok','SIGNÁL POTVRDENÝ');
+      setTbAi('SIGNÁL DETEGOVANÝ ◈ VSTUP POTVRDENÝ','live');
+    } else if(verdict==='POČKAŤ'){
+      setAiState('mo','MONITORUJEM');
+      setTbAi('MONITORUJEM ◈ VYČKÁVAM','warn');
+      document.getElementById('rBadge').textContent='MONITORUJEM';
+      document.getElementById('rBadge').style.color='#ffb300';
+      document.getElementById('rBadge').style.borderColor='rgba(255,179,0,.4)';
+    } else {
+      setAiState('le','NÍZKY EDGE');
+      setTbAi('NÍZKY EDGE ◈ VSTUP ZAMIETNUTÝ','red');
+      document.getElementById('rBadge').textContent='NÍZKY EDGE';
+      document.getElementById('rBadge').style.color='#ff2d55';
+      document.getElementById('rBadge').style.borderColor='rgba(255,45,85,.4)';
+    }
+    document.getElementById('cBadge').textContent='LIVE';
+
+    // Signal score animate
+    const numEl=document.getElementById('snum');numEl.style.color=cssCol;numEl.style.textShadow=`0 0 20px ${hexcol}`;
+    let n=0;const step=Math.max(1,Math.ceil(d.score/60));
+    const ni=setInterval(()=>{n=Math.min(n+step,d.score);numEl.textContent=n;if(n>=d.score)clearInterval(ni);},15);
+
+    // Confidence
+    const cfp=document.getElementById('cfp');const cfb=document.getElementById('cfbar');
+    cfp.style.color=hexcol;cfb.style.background=hexcol;cfb.style.boxShadow=`0 0 7px ${hexcol}`;
+    let cn=0;setTimeout(()=>{cfb.style.width=d.score+'%';const ci=setInterval(()=>{cn=Math.min(cn+step,d.score);cfp.textContent=cn+'%';if(cn>=d.score)clearInterval(ci);},15);},100);
+
+    // Prob badge
+    const pb=document.getElementById('pbadge');pb.style.display='inline-flex';
+    const[bc,bt]=d.score>=70?['pb-h','VYSOKÁ PRAVDEPODOBNOSŤ']:d.score>=45?['pb-m','STREDNÁ PRAVDEPODOBNOSŤ']:['pb-l','NÍZKA PRAVDEPODOBNOSŤ'];
+    pb.className='pbadge '+bc;document.getElementById('pbTxt').textContent=bt;
+
+    // Verdict
+    const vcls=verdict==='VSTÚPIŤ'?'vs-v':verdict==='POČKAŤ'?'vs-a':'vs-r';
+    document.getElementById('vbox').className='vbox '+vcls;
+    document.getElementById('vtxt').textContent=verdict;
+    document.getElementById('vsub').textContent=`${mode.toUpperCase()} · ${MKT[d.market]} · ${d.minute}'`;
+
+    // Stake
+    document.getElementById('strow').style.display='flex';
+    document.getElementById('stakeV').textContent=stake==='—'?'—':stake+' bankrollu';
+    document.getElementById('riskV').textContent=mode==='safe'?'NÍZKE':mode==='balanced'?'STREDNÉ':'VYSOKÉ';
+    document.getElementById('mktV').textContent=MKT[d.market];
+
+    // Score Breakdown
+    document.getElementById('bdwrap').style.display='block';
+    const bdlist=document.getElementById('bdlist');bdlist.innerHTML='';
+    d.breakdown.forEach((item,i)=>{
+      const div=document.createElement('div');
+      div.className='bditem '+(item.ok?'ok':'no');
+      div.style.animationDelay=(i*40)+'ms';
+      div.innerHTML=`<span class="bdl">${item.l}</span><span class="bdp">${item.p}</span>`;
+      bdlist.appendChild(div);
+    });
+    document.getElementById('bdtotal').textContent=`${d.score} / 100`;
+
+    // AI
+    document.getElementById('aiMode').textContent=`--mode=${mode}`;
+    const key=verdict==='VSTÚPIŤ'?'vstup':verdict==='POČKAŤ'?'cakaj':'nie';
+    typeAI(AI[key][Math.floor(Math.random()*AI[key].length)]);
+
+    // Dots
+    const[d1,d2,d3]=['dot1','dot2','dot3'].map(i=>document.getElementById(i));
+    if(verdict==='VSTÚPIŤ'){d1.className='sdt sdt-g';d2.className='sdt sdt-g';d3.className='sdt sdt-g';}
+    else if(verdict==='POČKAŤ'){d1.className='sdt sdt-g';d2.className='sdt sdt-a';d3.className='sdt sdt-a';}
+    else{d1.className='sdt sdt-a';d2.className='sdt sdt-r';d3.className='sdt sdt-r';}
+
+    // Save
+    addSig({home,away,sH:d.sH,sA:d.sA,min:d.minute,mkt:MKT[d.market],sig:d.score,v:verdict,mode,stake,time:new Date().toTimeString().slice(0,5)});
+
+    stopStandbyRot(); // verdict is set — stop standby rotation
+    startTbRotation();
+    setTimeout(()=>{if(verdict!=='VSTÚPIŤ'){startSB();startStandbyRot();}},5000);
+  });
+}
+
+// ── PRESSURE GRAPH ──
+const PH=[];const PHMAX=28;
+const GA={frame:null,prog:1,dot:0,ts:0,standby:true};
+
+function initGraph(){
+  const cv=document.getElementById('pgraph');if(!cv)return;
+  const dpr=window.devicePixelRatio||1;
+  const w=cv.getBoundingClientRect().width||cv.offsetWidth||300;
+  cv.width=Math.round(w*dpr);cv.style.width='100%';
+  if(!GA.frame) GA.frame=requestAnimationFrame(graphLoop);
+}
+
+function updateGraph(score){
+  PH.push(score);if(PH.length>PHMAX)PH.shift();
+  const pv=document.getElementById('pgVal');if(pv)pv.textContent=score;
+  GA.prog=0;GA.standby=false; // trigger left-to-right draw
+}
+
+function graphLoop(ts){
+  GA.ts=ts;
+  if(GA.prog<1) GA.prog=Math.min(1,GA.prog+0.038);
+  GA.dot=(GA.dot+(GA.standby?0.004:0.012))%1;
+  drawGraph();
+  GA.frame=requestAnimationFrame(graphLoop);
+}
+
+function drawGraph(){
+  const cv=document.getElementById('pgraph');if(!cv)return;
+  const W=cv.width,H=cv.height;
+  const ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#060f1a';ctx.fillRect(0,0,W,H);
+  // grid
+  [35,65].forEach(v=>{
+    const y=H-(v/100)*H;
+    ctx.strokeStyle=v===65?'rgba(0,255,247,.1)':'rgba(0,255,247,.05)';
+    ctx.lineWidth=1;ctx.setLineDash([2,4]);
+    ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();
+  });
+  ctx.setLineDash([]);
+
+  // STANDBY: flatline with moving dot
+  if(PH.length<2){
+    const t=GA.ts*0.001;
+    const baseY=H*0.58;
+    ctx.strokeStyle='rgba(0,255,247,0.2)';ctx.lineWidth=1;
+    ctx.shadowBlur=3;ctx.shadowColor='rgba(0,255,247,.4)';
+    ctx.beginPath();
+    for(let x=0;x<=W;x+=3){
+      const y=baseY+Math.sin(x*.05+t*2)*2.5+Math.sin(x*.018+t)*.8*3;
+      x===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    }
+    ctx.stroke();ctx.shadowBlur=0;
+    // scanning dot on flatline
+    const dx=GA.dot*W;
+    const dy=baseY+Math.sin(dx*.05+t*2)*2.5+Math.sin(dx*.018+t)*.8*3;
+    ctx.fillStyle='rgba(0,255,247,.7)';ctx.shadowBlur=8;ctx.shadowColor='rgba(0,255,247,.6)';
+    ctx.beginPath();ctx.arc(dx,dy,2.5,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
+    return;
+  }
+
+  const pts=PH.map((v,i)=>({x:(i/(PHMAX-1))*W,y:H-(v/100)*H}));
+  const last=PH[PH.length-1];
+  const lineC=last>=65?'#00ff88':last>=45?'#ffb300':'#ff2d55';
+  const fillC=last>=65?'rgba(0,255,136,':last>=45?'rgba(255,179,0,':'rgba(255,45,85,';
+  const clipX=GA.prog*W;
+
+  // clip for progressive draw
+  ctx.save();
+  ctx.beginPath();ctx.rect(0,0,clipX,H);ctx.clip();
+
+  // fill
+  const grad=ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,fillC+'0.13)');grad.addColorStop(1,fillC+'0)');
+  ctx.fillStyle=grad;ctx.beginPath();
+  pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
+  ctx.lineTo(pts[pts.length-1].x,H);ctx.lineTo(0,H);ctx.closePath();ctx.fill();
+
+  // line with pulse opacity
+  const pulse=0.75+0.25*Math.sin(GA.ts*0.002);
+  ctx.globalAlpha=pulse;
+  ctx.strokeStyle=lineC;ctx.lineWidth=1.5;ctx.shadowBlur=6;ctx.shadowColor=lineC;
+  ctx.beginPath();pts.forEach((p,i)=>i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
+  ctx.stroke();ctx.shadowBlur=0;ctx.globalAlpha=1;
+
+  ctx.restore(); // end clip
+
+  // scanning dot moving along line
+  const visLen=Math.floor(GA.dot*(pts.length-1));
+  const sdp=pts[visLen]||pts[pts.length-1];
+  if(sdp.x<=clipX){
+    ctx.fillStyle=lineC;ctx.shadowBlur=14;ctx.shadowColor=lineC;
+    ctx.beginPath();ctx.arc(sdp.x,sdp.y,3.5,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
+  }
+  // end dot (latest value) — always at clip edge
+  const ep=pts[pts.length-1];
+  if(ep.x<=clipX){
+    ctx.fillStyle='#fff';ctx.shadowBlur=6;ctx.shadowColor=lineC;
+    ctx.beginPath();ctx.arc(ep.x,ep.y,2,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;
+  }
+}
+
+// ── AI LIVE LOG ──
+const MAX_LOG=8;
+function aiLog(msg,cls=''){
+  const body=document.getElementById('aiLogBody');if(!body)return;
+  const now=new Date();const ts=now.toTimeString().slice(3,8); // MM:SS
+  const line=document.createElement('div');
+  line.className='ai-log-line'+(cls?' '+cls:'');
+  line.innerHTML=`<span class="ts">[${ts}]</span>${msg}`;
+  body.appendChild(line);
+  // Keep max 8 lines
+  while(body.children.length>MAX_LOG)body.removeChild(body.firstChild);
+  body.scrollTop=body.scrollHeight;
+}
+
+// ── AMBIENT AI LOG (fires every 8-12s based on current state) ──
+const AMBIENT_MSGS={
+  highConf: ['Sila signálu rastie','Podmienky vstupu sa zbiehajú','Edge sa rozširuje — spoľahlivosť stúpa','Neurálny vzorec potvrdený'],
+  highPress: ['Nárast tlaku detegovaný','Defenzívna štruktúra oslabuje','Vysoké tempo hry','Frekvencia útokov stúpa'],
+  highXG:   ['Vysoké xG okno aktívne','Prah očakávaných gólov dosiahnutý','Pravdepodobnosť gólu zvýšená','xG momentum rastie'],
+  lateMins: ['Neskoré gólové okno aktívne','Minúty 60–80 — optimálna zóna vstupu','Tlak hodín rastie'],
+  default:  ['Monitorujem live dáta','Skenujem signálové vzorce','Neural feed nominálny','Analyzujem dynamiku zápasu','Sledujem momentum vektory']
+};
+function pickAmbient(d){
+  const conf=d?d.score:0;
+  const press=d?Math.min(Math.round((d.attacks||0)/18),10):0;
+  const xg=d?d.xg:0;
+  const min=d?d.minute:0;
+  const pool=[];
+  if(conf>=70)  pool.push(...AMBIENT_MSGS.highConf);
+  if(press>6)   pool.push(...AMBIENT_MSGS.highPress);
+  if(xg>1.5)   pool.push(...AMBIENT_MSGS.highXG);
+  if(min>=60&&min<=80) pool.push(...AMBIENT_MSGS.lateMins);
+  if(!pool.length) pool.push(...AMBIENT_MSGS.default);
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+let _lastCalcData=null;
+function startAmbientLog(){
+  const fire=()=>{
+    const msg=pickAmbient(_lastCalcData);
+    const cls=_lastCalcData&&_lastCalcData.score>=70?'alert':_lastCalcData&&_lastCalcData.score>=45?'warn':'';
+    aiLog(msg,cls);
+    // Next fire 8-12s
+    setTimeout(fire, 8000+Math.random()*4000);
+  };
+  setTimeout(fire, 3000);
+}
+
+// ── AUTO SIGNAL WATCHER ──
+let lastConfidence=0;
+
+function watchSignal(d,verdict){
+  const conf=d.score;
+  const delta=conf-lastConfidence;
+  const shouldAlert=conf>=75||(delta>=15&&conf>40);
+
+  // Generate contextual log entries
+  const pressure=Math.min(Math.round(d.attacks/18),10)||d.pressure;
+  if(pressure>7)         aiLog('Nárast tlaku detegovaný — defenzíva oslabuje','warn');
+  if(d.xg>1.5)           aiLog('Vysoké xG okno aktívne — pravdepodobnosť gólu zvýšená','warn');
+  if(d.minute>=60&&d.minute<=80) aiLog('Neskoré gólové okno aktívne — minúty 60–80','warn');
+  if(delta>=15&&conf>40) aiLog(`Spoľahlivosť signálu vzrástla +${delta} → ${conf}`,'alert');
+  if(d.attacks>60)       aiLog('Frekvencia nebezpečných útokov kritická','warn');
+  if(d.corners>=8)       aiLog('Tlak rohov rastie — hrozba štandardných situácií','');
+  if(d.xg>2.5)           aiLog('Prah xG prekročený — bezprostredné gólové riziko','alert');
+  if(verdict==='VSTÚPIŤ'&&conf>=75&&!document.getElementById('colRight')?.classList.contains('signal-lock')){
+    activateSignalLock();
+  }
+  if(verdict==='NESTÁVKOVAŤ'&&conf<35) aiLog('Nízky edge potvrdený — vstup neodporúčaný','err');
+
+  // Auto-alert state
+  if(shouldAlert&&verdict==='VSTÚPIŤ'){
+    const colR=document.getElementById('colRight');
+    if(colR&&!colR.classList.contains('enter-mode')){
+      colR.classList.add('enter-mode');
+      document.querySelector('.col-center').style.borderRight='1px solid rgba(0,255,136,.55)';
+      const fl=document.getElementById('eFlash');
+      fl.className='';void fl.offsetWidth;fl.className='on';
+      aiLog('AUTO-ALERT: Prah VSTÚPIŤ dosiahnutý — signál uložený','alert');
+      // Auto-save to history
+      const home=document.getElementById('home').value||'Live Zápas';
+      const away=document.getElementById('away').value||'';
+      addSig({
+        home,away,
+        sH:d.sH,sA:d.sA,min:d.minute,
+        mkt:MKT[d.market],sig:d.score,
+        v:verdict,mode,
+        stake:getStake(d.score,mode),
+        time:new Date().toTimeString().slice(0,5)
+      });
+    }
+  }
+
+  lastConfidence=conf;
+}
+
+// ── LIVE DATA MODE ──
+let liveMode=false,liveTimer=null,liveFixtureId=null,liveCountdown=30;
+
+// ── Slider helper — sets value, fill gradient and display text ──
+function setSl(sliderId, displayId, value, isXG=false){
+  if(value==null||isNaN(value))return;
+  const sl=document.getElementById(sliderId);
+  if(!sl)return;
+  sl.value=value;
+  const pct=((value - +sl.min)/(+sl.max - +sl.min))*100;
+  sl.style.background=`linear-gradient(to right,var(--cd) ${Math.max(0,Math.min(100,pct))}%,var(--bg4) ${Math.max(0,Math.min(100,pct))}%)`;
+  const dv=document.getElementById(displayId);
+  if(dv)dv.textContent=isXG?(value/100).toFixed(2):value;
+}
+
+function setLiveMode(on){
+  liveMode=on;
+  document.getElementById('btnManual').className='lm-btn'+(on?'':' lm-on');
+  document.getElementById('btnLive').className='lm-btn'+(on?' lm-live':'');
+  document.getElementById('livePanel').style.display=on?'block':'none';
+  if(on){
+    fetchLiveMatches();
+    liveCountdown=30;
+    // 1-second tick for countdown display + refresh trigger
+    liveTimer=setInterval(async()=>{
+      liveCountdown--;
+      const st=document.getElementById('lvStatus');
+      if(liveCountdown<=0){
+        liveCountdown=30;
+        if(liveFixtureId) await applyMatchStats(false);
+        else               await fetchLiveMatches();
+      } else if(liveFixtureId && st && !st.innerHTML.includes('lv-dot')){
+        const t=new Date().toTimeString().slice(0,5);
+        st.textContent=`Aktualizované · ${t} · refresh za ${liveCountdown}s`;
+      }
+    },1000);
+  } else {
+    if(liveTimer){clearInterval(liveTimer);liveTimer=null;}
+    liveFixtureId=null;
+    document.getElementById('lvStatus').textContent='—';
+  }
+}
+
+let _liveEmptyTimer=null;
+async function fetchLiveMatches(){
+  const sel=document.getElementById('matchSelect');
+  const st=document.getElementById('lvStatus');
+  st.innerHTML='<span class="lv-dot"></span>Načítavam live zápasy...';
+  try{
+    const res=await fetch('/.netlify/functions/get-live-matches');
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data=await res.json();
+
+    // API-level error (limit, bad key, etc.)
+    if(data.apiError){
+      if(data.limitExceeded){
+        sel.innerHTML='<option value="">⚠ Denný limit API vyčerpaný</option>';
+        st.textContent='API-Football: denný limit vyčerpaný. Obnova o polnoci.';
+      } else {
+        sel.innerHTML=`<option value="">⚠ API chyba</option>`;
+        st.textContent='API chyba: '+data.apiError.slice(0,70);
+      }
+      aiLog('Live API: '+data.apiError.slice(0,60),'err');
+      return;
+    }
+
+    const ms=data.matches||[];
+    const prev=sel.value;
+    if(ms.length===0){
+      sel.innerHTML='<option class="live-scanning" value="">⟳ Skenujem live zápasy...</option>';
+      const t=new Date().toTimeString().slice(0,5);
+      st.textContent=`Žiadne live zápasy · ${t} · retry za 30s`;
+      if(_liveEmptyTimer)clearTimeout(_liveEmptyTimer);
+      _liveEmptyTimer=setTimeout(fetchLiveMatches,30000);
+    } else {
+      if(_liveEmptyTimer){clearTimeout(_liveEmptyTimer);_liveEmptyTimer=null;}
+      sel.innerHTML='<option value="">— vyber zápas —</option>'+ms.map(m=>
+        `<option value="${m.id}">${m.home} vs ${m.away} · ${m.scoreH}:${m.scoreA} · ${m.minute}' [${m.league}]</option>`
+      ).join('');
+      if(prev&&ms.find(m=>String(m.id)===prev))sel.value=prev;
+      const t=new Date().toTimeString().slice(0,5);
+      st.textContent=`${ms.length} live zápasov · ${t}`;
+    }
+  }catch(e){
+    const msg=e.message||'Neznáma chyba';
+    st.textContent='Chyba: '+msg.slice(0,60);
+    sel.innerHTML=`<option value="">✕ ${msg.slice(0,40)}</option>`;
+    if(_liveEmptyTimer)clearTimeout(_liveEmptyTimer);
+    _liveEmptyTimer=setTimeout(fetchLiveMatches,30000);
+  }
+}
+
+// Called on dropdown change — runs full scoring engine
+async function selectMatch(id){
+  if(!id||id==='')return;
+  liveFixtureId=String(id);
+  liveCountdown=30;
+  await applyMatchStats(true); // first selection → full analysis with animation
+}
+
+// Core: fetch → map to sliders → optionally run scoring
+async function applyMatchStats(triggerRun=false){
+  if(!liveFixtureId)return;
+  const st=document.getElementById('lvStatus');
+  st.innerHTML='<span class="lv-dot"></span>Načítavam štatistiky...';
+  try{
+    const url=`/.netlify/functions/get-match-stats?fixture=${liveFixtureId}`;
+    const res=await fetch(url);
+    if(!res.ok)throw new Error(`HTTP ${res.status}`);
+    const data=await res.json();
+    if(data.error)throw new Error(data.error);
+
+    console.log('[APEX LIVE] response:', JSON.stringify(data));
+
+    // 1. Fixture info → input fields
+    if(data.fixture){
+      const f=data.fixture;
+      document.getElementById('home').value   = f.home   || '';
+      document.getElementById('away').value   = f.away   || '';
+      document.getElementById('scoreH').value = f.scoreH ?? 0;
+      document.getElementById('scoreA').value = f.scoreA ?? 0;
+      document.getElementById('minute').value = f.minute || 45;
+    }
+
+    // 2. Slider mapping (explicit — no sv() dependency)
+    if(data.sliders && data.statsAvailable){
+      const s=data.sliders;
+      setSl('s-shots',    'v-shots',    s.shots);           // Total Shots
+      setSl('s-attacks',  'v-attacks',  s.attacks);         // Dangerous Attacks
+      setSl('s-corners',  'v-corners',  s.corners);         // Corner Kicks
+      setSl('s-poss',     'v-poss',     s.poss);            // Ball Possession (% stripped)
+      setSl('s-xg',       'v-xg',       s.xg,   true);      // xG ×100 in slider, display /100
+      setSl('s-pressure', 'v-pressure', s.pressure);        // Attacks/18 → 1-10
+      aiLog(`Štatistiky načítané — strely:${s.shots} xG:${(s.xg/100).toFixed(2)} útoky:${s.attacks}`,'');
+    } else if(!data.statsAvailable){
+      aiLog('Štatistiky ešte nie sú dostupné pre tento zápas','warn');
+    }
+
+    // 3. Update live preview score
+    lu();
+
+    // 4. Signal watcher (silent)
+    const wd=calcScore();
+    watchSignal(wd, getVerdict(wd.score));
+
+    // 5. Auto-run scoring on first match selection
+    if(triggerRun) run();
+
+    const t=new Date().toTimeString().slice(0,8);
+    const statsNote=data.statsAvailable?'':'(bez stats)';
+    st.textContent=`Aktualizované · ${t} ${statsNote}· refresh za ${liveCountdown}s`;
+
+  }catch(e){
+    console.error('[APEX LIVE] error:',e);
+    st.textContent='Chyba: '+e.message.slice(0,60);
+    aiLog('Chyba načítania štatistík: '+e.message.slice(0,40),'err');
+  }
+}
+
+// ── STANDBY PANEL ROTATION ──
+const SB_ROT=['SYSTÉM AKTÍVNY','ČAKÁM NA DÁTA','NEURAL ENGINE ONLINE','SKENUJEM...','MONITORUJEM LIVE DÁTA'];
+let sbRotIdx=0,sbRotTimer=null;
+function startStandbyRot(){
+  if(sbRotTimer)return;
+  sbRotTimer=setInterval(()=>{
+    const vbox=document.getElementById('vbox');
+    const vtxt=document.getElementById('vtxt');
+    if(!vbox||!vtxt||!vbox.classList.contains('vs-sb'))return;
+    sbRotIdx=(sbRotIdx+1)%SB_ROT.length;
+    vtxt.textContent=SB_ROT[sbRotIdx];
+  },3000);
+}
+function stopStandbyRot(){
+  if(sbRotTimer){clearInterval(sbRotTimer);sbRotTimer=null;}
+}
+
+// ── SIGNAL LOCK ──
+function activateSignalLock(){
+  const colR=document.getElementById('colRight');
+  if(!colR)return;
+  colR.classList.remove('enter-mode');
+  colR.classList.add('signal-lock');
+  const rb=document.getElementById('rBadge');
+  if(rb){rb.textContent='◈ SIGNÁL POTVRDENÝ';rb.style.color='#00ff88';rb.style.borderColor='rgba(0,255,136,.6)';}
+  const ch=document.querySelector('.col-right .col-hdr');
+  if(ch){ch.style.borderBottomColor='rgba(0,255,136,.4)';ch.style.background='rgba(0,255,136,.03)';}
+  aiLog('⚡ SIGNÁL POTVRDENÝ — PRAH VSTUPU DOSIAHNUTÝ','alert');
+  const fl=document.getElementById('eFlash');
+  if(fl){let c=0;const p=()=>{fl.className='';void fl.offsetWidth;fl.className='on';if(++c<3)setTimeout(p,650);};p();}
+}
+function deactivateSignalLock(){
+  const colR=document.getElementById('colRight');
+  if(colR)colR.classList.remove('signal-lock','enter-mode');
+  document.querySelector('.col-center').style.borderRight='';
+  const ch=document.querySelector('.col-right .col-hdr');
+  if(ch){ch.style.borderBottomColor='';ch.style.background='';}
+}
+
+// ── PANEL ZOOM SYSTEM ──
+function openZoom(colOrId, title){
+  // Accept string ID or direct DOM element
+  const col=typeof colOrId==='string'?document.getElementById(colOrId):colOrId;
+  if(!col)return;
+  const body=col.querySelector('.col-body');
+  if(!body)return;
+
+  const ob=document.getElementById('poBody');
+  document.getElementById('poTitle').textContent='// '+title;
+  ob.innerHTML='';
+
+  // Deep clone
+  const clone=body.cloneNode(true);
+
+  // 1. Remove zoom buttons (no recursive zoom)
+  clone.querySelectorAll('.zoom-btn').forEach(b=>b.remove());
+
+  // 2. Remove all IDs to prevent duplicate-ID conflicts in the live DOM
+  clone.querySelectorAll('[id]').forEach(el=>el.removeAttribute('id'));
+
+  // 3. Replace canvas elements with static snapshot or placeholder
+  clone.querySelectorAll('canvas').forEach(origCanvas=>{
+    // Try to snapshot the real canvas
+    const realCanvas=document.getElementById(
+      origCanvas.getAttribute('data-orig-id')||''
+    );
+    const srcCanvas=col.querySelector('canvas');
+    if(srcCanvas&&srcCanvas.width>0){
+      const img=document.createElement('img');
+      try{img.src=srcCanvas.toDataURL();}catch(e){} // tainted canvas fallback
+      img.style.cssText='width:100%;height:auto;border-radius:2px;display:block;';
+      origCanvas.parentNode.replaceChild(img,origCanvas);
+    } else {
+      const ph=document.createElement('div');
+      ph.style.cssText='background:var(--bg4);border:1px solid var(--bd);border-radius:2px;height:44px;display:flex;align-items:center;justify-content:center;';
+      ph.innerHTML='<span style="font-size:8px;letter-spacing:2px;color:var(--mut)">PRESSURE GRAPH</span>';
+      origCanvas.parentNode.replaceChild(ph,origCanvas);
+    }
+  });
+
+  // 4. Remove live-mode panel (confusing in zoom, has its own fetch)
+  clone.querySelectorAll('.lv-panel,.lm-row').forEach(el=>el.remove());
+
+  // 5. Flatten col-body padding/overflow for overlay context
+  clone.style.cssText='padding:0;overflow:visible;height:auto;';
+
+  ob.appendChild(clone);
+
+  // Trigger transition
+  requestAnimationFrame(()=>{
+    document.getElementById('panelOverlay').classList.add('visible');
+  });
+  document.body.style.overflow='hidden';
+}
+
+function closeZoom(){
+  const ov=document.getElementById('panelOverlay');
+  ov.classList.remove('visible');
+  document.body.style.overflow='';
+  // Clear content after transition ends
+  setTimeout(()=>{document.getElementById('poBody').innerHTML='';},300);
+}
+
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeZoom();});
+document.getElementById('panelOverlay').addEventListener('click',function(e){
+  if(e.target===this)closeZoom();
+});
+
+// ── AI TICKET ──
+function openTicket(){
+  document.getElementById('ticketOverlay').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function closeTicket(){
+  document.getElementById('ticketOverlay').classList.remove('open');
+  document.body.style.overflow='';
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeTicket();});
+document.getElementById('ticketOverlay').addEventListener('click',function(e){if(e.target===this)closeTicket();});
+
+// Toggle groups
+document.querySelectorAll('.tkt-tog').forEach(grp=>{
+  grp.querySelectorAll('.tkt-tb').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      grp.querySelectorAll('.tkt-tb').forEach(b=>{b.classList.remove('sel','sel-a');});
+      btn.classList.add('sel');
+    });
+  });
+});
+
+// Mock data pools
+const MOCK_MATCHES={
+  all:[
+    {h:'Slovan Bratislava',a:'Sparta Praha'},
+    {h:'Real Madrid',a:'Bayern München'},
+    {h:'Manchester City',a:'Arsenal'},
+    {h:'Liverpool',a:'Chelsea'},
+    {h:'PSG',a:'Marseille'},
+    {h:'Dortmund',a:'Leverkusen'},
+    {h:'Inter Miláno',a:'AC Miláno'},
+    {h:'Atlético Madrid',a:'Sevilla'},
+    {h:'Ajax',a:'PSV Eindhoven'},
+    {h:'Porto',a:'Benfica'},
+    {h:'Fenerbahce',a:'Galatasaray'},
+    {h:'Celtic',a:'Rangers'},
+  ],
+  top:[
+    {h:'Real Madrid',a:'Bayern München'},
+    {h:'Manchester City',a:'Arsenal'},
+    {h:'Liverpool',a:'Chelsea'},
+    {h:'PSG',a:'Marseille'},
+    {h:'Inter Miláno',a:'AC Miláno'},
+    {h:'Atlético Madrid',a:'Sevilla'},
+  ]
+};
+
+const MKT_LABELS={over15:'Over 1.5',over25:'Over 2.5',btts:'BTTS',home:'Favorit vyhrá'};
+const RISK_LABELS={safe:'NÍZKE',balanced:'STREDNÉ',aggressive:'VYSOKÉ'};
+const CONF_RANGES={safe:[72,88],balanced:[62,80],aggressive:[55,74]};
+const STAKE_TIPS={safe:'1–2%',balanced:'2–3%',aggressive:'3–5%'};
+
+function rnd(min,max){return Math.random()*(max-min)+min;}
+function rndInt(min,max){return Math.floor(rnd(min,max+1));}
+function shuffle(arr){return [...arr].sort(()=>Math.random()-.5);}
+
+async function generateTicket(){
+  const btn=document.getElementById('tktGenBtn');
+  btn.textContent='◈ ANALYZUJEM...';btn.classList.add('busy');
+
+  await new Promise(r=>setTimeout(r,1200)); // simulate AI thinking
+
+  const tktType =document.querySelector('#tktType .sel')?.dataset.val||'over25';
+  const tktMode =document.querySelector('#tktMode .sel')?.dataset.val||'balanced';
+  const tktCount=parseInt(document.querySelector('#tktCount .sel')?.dataset.val||'3');
+  const league  =document.querySelector('#tktLeague .sel')?.dataset.val||'all';
+  const oddsMin =parseFloat(document.getElementById('tktOddsMin').value)||1.3;
+  const oddsMax =parseFloat(document.getElementById('tktOddsMax').value)||2.5;
+
+  const pool=shuffle(MOCK_MATCHES[league]||MOCK_MATCHES.all);
+  const [cMin,cMax]=CONF_RANGES[tktMode];
+
+  const matches=pool.slice(0,tktCount).map((m,idx)=>{
+    const odds=+rnd(oddsMin,oddsMax).toFixed(2);
+    const conf=rndInt(cMin,cMax);
+    const confCls=conf>=75?'conf-h':conf>=60?'conf-m':'conf-l';
+    return{...m,odds,conf,confCls,delay:idx*80};
+  });
+
+  const totalOdds=+(matches.reduce((a,m)=>a*m.odds,1)).toFixed(2);
+  const stakeRec=STAKE_TIPS[tktMode];
+  const riskLbl=RISK_LABELS[tktMode];
+  const mktLbl=MKT_LABELS[tktType];
+
+  // Store for AI chat context
+  currentTicket=matches.map(m=>({domaci:m.h,hostia:m.a,market:mktLbl,kurz:m.odds,spolahlivos:m.conf+'%'}));
+  chatHistory=[];
+
+  const res=document.getElementById('tktResult');
+  res.style.display='block';
+  res.innerHTML=`
+    <div class="tkt-result-hdr">
+      <div class="tkt-result-ttl">VYGENEROVANÝ TIKET</div>
+      <div class="tkt-total-odds">${totalOdds}×</div>
+    </div>
+    ${matches.map((m,i)=>`
+      <div class="tkt-match" style="animation-delay:${m.delay}ms">
+        <div class="tkt-match-teams">${m.h} <span style="color:var(--mut);font-size:10px">vs</span> ${m.a}</div>
+        <div class="tkt-match-row">
+          <span class="tkt-badge mkt">${mktLbl}</span>
+          <span class="tkt-badge ${m.confCls}">${m.conf}% CONF</span>
+          <span class="tkt-badge" style="color:var(--mut);border-color:rgba(100,120,130,.3)">${riskLbl}</span>
+          <span class="tkt-match-odds">@${m.odds}</span>
+        </div>
+      </div>
+    `).join('')}
+    <div class="tkt-summary">
+      <div class="tkt-sum-item">
+        <div class="tkt-sum-lbl">CELKOVÝ KURZ</div>
+        <div class="tkt-sum-val amber">${totalOdds}×</div>
+      </div>
+      <div class="tkt-sum-item">
+        <div class="tkt-sum-lbl">ODPORÚČANÁ STÁVKA</div>
+        <div class="tkt-sum-val">${stakeRec} bankrollu</div>
+      </div>
+      <div class="tkt-sum-item">
+        <div class="tkt-sum-lbl">RIZIKO</div>
+        <div class="tkt-sum-val ${tktMode==='safe'?'green':tktMode==='balanced'?'':''}">${riskLbl}</div>
+      </div>
+      <div class="tkt-sum-item">
+        <div class="tkt-sum-lbl">ZÁPASOV</div>
+        <div class="tkt-sum-val green">${matches.length}</div>
+      </div>
+    </div>`;
+
+  // Append chat UI below results
+  res.innerHTML += `
+    <div class="tkt-chat-wrap" id="tktChatWrap">
+      <div class="tkt-chat-hdr">AI ASISTENT</div>
+      <div class="tkt-msgs" id="tktMsgs">
+        <div class="cm ai">
+          <div class="cm-who">APEX-AI</div>
+          <div class="cm-bubble">Tiket vygenerovaný. Môžeš sa opýtať na akýkoľvek výber, požiadať o náhradu zápasu, alebo vysvetlenie kurzu.</div>
+        </div>
+      </div>
+      <button class="tkt-apply-btn" id="tktApplyBtn" onclick="applyAiChange()">◈ APLIKOVAŤ NAVRHNUTÚ ZMENU</button>
+      <div class="tkt-chat-row">
+        <input class="tkt-chat-inp" id="tktChatInp" placeholder="Spýtaj sa AI..." onkeydown="if(event.key==='Enter')sendChat()"/>
+        <button class="tkt-chat-send" id="tktChatSend" onclick="sendChat()">ODOSLAŤ</button>
+      </div>
+    </div>`;
+
+  res.scrollIntoView({behavior:'smooth',block:'nearest'});
+  btn.textContent='⚡ GENEROVAŤ TIKET';btn.classList.remove('busy');
+}
+
+// ── AI CHAT ──
+let chatHistory=[];
+let currentTicket=null;
+let pendingAiChange=null;
+
+function addMsg(role, text, isTyping=false){
+  const msgs=document.getElementById('tktMsgs');
+  if(!msgs)return;
+  const div=document.createElement('div');
+  div.className='cm '+(role==='user'?'user':'ai')+(isTyping?' cm-typing':'');
+  div.id=isTyping?'tktTyping':'';
+  div.innerHTML=`
+    <div class="cm-who">${role==='user'?'TY':'APEX-AI'}</div>
+    <div class="cm-bubble">${isTyping?'<span class="typing-dots"><span>▪</span><span>▪</span><span>▪</span></span> AI analyzuje...':escHtml(text)}</div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop=msgs.scrollHeight;
+  return div;
+}
+
+function escHtml(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br/>');}
+
+async function sendChat(){
+  const inp=document.getElementById('tktChatInp');
+  const send=document.getElementById('tktChatSend');
+  const msg=(inp?.value||'').trim();
+  if(!msg)return;
+  inp.value='';
+  send.disabled=true;
+
+  addMsg('user',msg);
+  chatHistory.push({role:'user',content:`Aktuálny tiket: ${JSON.stringify(currentTicket||[])}\n\nOtázka: ${msg}`});
+
+  // Typing indicator
+  addMsg('ai','',true);
+
+  try{
+    const body={
+      model:'claude-sonnet-4-20250514',
+      max_tokens:600,
+      system:'Si AI ticket asistent pre APEX SIGNAL football betting terminál. Pracuješ IBA s aktuálne vygenerovaným tiketom. Odpovedaj KRÁTKO (max 4 vety), takticky, po SLOVENSKY. Môžeš: vysvetliť výbery, označiť najrizikovejší zápas, navrhnúť náhradu zápasu, zmeniť počet zápasov. Ak navrhuješ konkrétnu zmenu tiketu, začni odpoveď textom [ZMENA]:',
+      messages:[{role:'user',content:`Tiket: ${JSON.stringify(currentTicket||[])}\n\nOtázka: ${msg}`}]
+    };
+
+    const res=await fetch('/.netlify/functions/ai-chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const data=await res.json();
+
+    // Remove typing indicator
+    document.getElementById('tktTyping')?.remove();
+
+    const aiText=data.content?.[0]?.text||data.error||'Chyba komunikácie s AI.';
+    addMsg('ai',aiText);
+    chatHistory.push({role:'assistant',content:aiText});
+
+    // Detect AI-proposed change
+    const applyBtn=document.getElementById('tktApplyBtn');
+    if(aiText.includes('[ZMENA]:')){
+      pendingAiChange=aiText.split('[ZMENA]:').pop().trim();
+      if(applyBtn){applyBtn.classList.add('visible');applyBtn.textContent=`◈ APLIKOVAŤ: ${pendingAiChange.slice(0,60)}...`;}
+    } else {
+      pendingAiChange=null;
+      if(applyBtn)applyBtn.classList.remove('visible');
+    }
+
+  }catch(e){
+    document.getElementById('tktTyping')?.remove();
+    addMsg('ai','Chyba pripojenia k AI: '+e.message.slice(0,60));
+  }
+
+  if(send)send.disabled=false;
+  document.getElementById('tktChatInp')?.focus();
+}
+
+function applyAiChange(){
+  if(!pendingAiChange)return;
+  addMsg('ai',`Zmena aplikovaná: ${pendingAiChange}`);
+  const btn=document.getElementById('tktApplyBtn');
+  if(btn)btn.classList.remove('visible');
+  pendingAiChange=null;
+}
+
+// ── INIT ──
+initSliders();lu();refreshCounts();renderHistory();renderPerf();startSB();startTbRotation();startAmbientLog();startStandbyRot();
+requestAnimationFrame(()=>{initGraph();});
+</script>
+</body>
+</html>
+
