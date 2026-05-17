@@ -1147,11 +1147,11 @@ function setMode(m){
 }
 
 // ── SCORE ENGINE v2 ──
-function calcScore(){
+function calcScore(marketOverride){
   const minute  =parseInt(document.getElementById('minute').value)||45;
   const sH      =parseInt(document.getElementById('scoreH').value)||0;
   const sA      =parseInt(document.getElementById('scoreA').value)||0;
-  const market  =document.getElementById('market').value;
+  const market  =marketOverride||document.getElementById('market').value;
   const total   =sH+sA;
   const diff    =Math.abs(sH-sA);
   const shots   =Math.min(parseInt(document.getElementById('s-shots').value)||0,   25);
@@ -1372,6 +1372,93 @@ function lu(){
   else[...g.children].forEach((el,i)=>{el.className='lci '+(conds[i].p?'pass':'fail');el.querySelector('.lci-i').textContent=conds[i].p?'✓':'✗';});
   updateGraph(d.invalidated?0:d.score);
   _lastCalcData=d;
+  _renderBestSignal();
+}
+
+// ── BEST SIGNAL NOW ──────────────────────────────────────────
+const BSN_MARKETS=['goal_alert','btts','next_goal','late_goal'];
+
+function calcAllMarkets(){
+  return BSN_MARKETS.map(m=>{
+    const d=calcScore(m);
+    return{...d,verdict:getVerdict(d.score,d.invalidated)};
+  });
+}
+
+function getBestSignal(){
+  const vel=_getVelocity();
+  const velBonus=vel&&vel.score>8?8:vel&&vel.score>4?4:0;
+  const valid=calcAllMarkets()
+    .filter(d=>!d.invalidated&&d.score>=36)
+    .map(d=>({...d,rank:d.score+velBonus}))
+    .sort((a,b)=>b.rank-a.rank);
+  return valid[0]||null;
+}
+
+function _renderBestSignal(){
+  // Get or create panel — injected into center column body below conditions
+  let panel=document.getElementById('bsnPanel');
+  if(!panel){
+    const cb=document.querySelector('.col-center .col-body');
+    if(!cb)return;
+    panel=document.createElement('div');
+    panel.id='bsnPanel';
+    panel.style.cssText='background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin-top:10px;transition:border-color .35s,box-shadow .35s;';
+    cb.appendChild(panel);
+  }
+
+  const all=calcAllMarkets();
+  const best=getBestSignal();
+  const vel=_getVelocity();
+
+  const hdr='<div style="font-family:\'IBM Plex Mono\',monospace;font-size:8px;color:var(--mut);letter-spacing:2.5px;text-transform:uppercase;margin-bottom:7px">◈ BEST SIGNAL NOW</div>';
+
+  if(!best){
+    panel.style.borderColor='var(--border)';
+    panel.style.boxShadow='none';
+    // Still show all-market status
+    const allRow=all.map(d=>{
+      const cls=d.invalidated?'#444':VERDICT_COLOR[getVerdict(d.score,d.invalidated)]||'#555';
+      const lbl=d.invalidated?'INVALID':d.score+'';
+      return`<span style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:${cls}">${MKT[d.market]}: ${lbl}</span>`;
+    }).join('<span style="color:#333"> · </span>');
+    panel.innerHTML=hdr+
+      '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:#555;letter-spacing:2px;text-align:center;padding:4px 0">— NO STRONG EDGE —</div>'+
+      '<div style="margin-top:7px;padding-top:6px;border-top:1px solid var(--border)">'+allRow+'</div>';
+    return;
+  }
+
+  const col=VERDICT_COLOR[best.verdict]||'var(--r)';
+  const glow=best.verdict==='HIGH ALERT'?`0 0 18px rgba(255,255,255,.15)`:
+             best.verdict==='ENTER'?`0 0 14px rgba(0,255,136,.12)`:'none';
+  panel.style.borderColor=col;
+  panel.style.boxShadow=glow;
+
+  // Top reason (first non-empty reason from engine)
+  const reason=(best.reasons||[]).find(r=>r.length>0)||'';
+  // Velocity hint
+  const velHint=vel&&vel.score>5?`<span style="color:var(--g)">⬆ Signal rastie (+${vel.score})</span>`:
+                vel&&vel.score<-5?`<span style="color:var(--r)">⬇ Signal klesa (${vel.score})</span>`:'';
+  // Other markets row
+  const others=all.filter(d=>d.market!==best.market).map(d=>{
+    const v=getVerdict(d.score,d.invalidated);
+    const c=d.invalidated?'#444':VERDICT_COLOR[v]||'#555';
+    const lbl=d.invalidated?'×':d.score+'';
+    return`<span style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:${c}">${MKT[d.market]}: ${lbl}</span>`;
+  }).join('<span style="color:#333"> · </span>');
+
+  panel.innerHTML=hdr+
+    `<div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:5px">
+       <div style="font-family:'Orbitron',sans-serif;font-size:13px;font-weight:700;color:${col};letter-spacing:1px">${MKT[best.market]}</div>
+       <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:${col};letter-spacing:1px">${best.verdict}</div>
+     </div>
+     <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:6px">
+       <span style="font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:700;color:${col};text-shadow:0 0 14px ${col}40">${best.score}</span>
+       <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--mut)">/100</span>
+       ${velHint?`<span style="font-family:'IBM Plex Mono',monospace;font-size:9px">${velHint}</span>`:''}
+     </div>
+     ${reason?`<div style="font-size:10px;color:var(--text2);line-height:1.5;margin-bottom:6px">${reason}</div>`:''}
+     <div style="padding-top:5px;border-top:1px solid var(--border)">${others}</div>`;
 }
 
 // ── AI MESSAGES ──
