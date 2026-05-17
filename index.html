@@ -995,116 +995,49 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
   <!-- RIGHT: AI RESULT TERMINAL -->
   <div class="col col-right" id="colRight">
     <div class="col-hdr">
-      <div class="cht">AI VÝSLEDKOVÝ TERMINÁL</div>
+      <div class="cht">AI DECISION TERMINAL</div>
       <div style="display:flex;gap:6px;align-items:center">
-        <div class="chb" id="rBadge">POHOTOVOSŤ</div>
-        <button onclick="openBSNModal()" title="Zobraziť AI analýzu na celú obrazovku"
+        <div class="chb" id="rBadge">ČAKÁM</div>
+        <button onclick="openBSNModal()" title="AI analýza — celá obrazovka"
           style="background:rgba(0,255,247,.06);border:1px solid rgba(0,255,247,.25);
                  color:#00fff7;font-family:'IBM Plex Mono',monospace;font-size:9px;
                  letter-spacing:1.5px;padding:3px 10px;border-radius:2px;cursor:pointer;
                  transition:all .2s;white-space:nowrap"
           onmouseover="this.style.background='rgba(0,255,247,.14)';this.style.borderColor='#00fff7'"
           onmouseout="this.style.background='rgba(0,255,247,.06)';this.style.borderColor='rgba(0,255,247,.25)'">
-          ⛶ AI ZOOM
+          ⛶ ZOOM
         </button>
       </div>
     </div>
     <div class="col-body">
 
-      <!-- AI Terminal -->
-      <div class="ait">
-        <div class="aith">
-          <div class="ai-id">APEX-AI v2.4</div>
-          <div class="ai-st sb" id="aiSt">◆ POHOTOVOSŤ</div>
-          <div class="ai-dots"><span></span><span></span><span></span></div>
-        </div>
-
-        <!-- Hexagonal cyber operator + message -->
-        <div class="ai-body-row">
-          <!-- Minimalist hex robot SVG -->
-          <div class="ai-svg-col">
-            <svg viewBox="0 0 48 58" fill="none" width="46" height="55">
-              <!-- Antenna -->
-              <line x1="24" y1="0" x2="24" y2="9" stroke="#00fff7" stroke-width="1.1"/>
-              <circle cx="24" cy="2" r="1.7" fill="#00fff7" style="animation:hexBlink .9s infinite"/>
-              <!-- Hex head (flat-top) -->
-              <polygon points="12,9 36,9 48,28 36,49 12,49 0,28"
-                fill="#020c10" stroke="#00fff7" stroke-width="1.1"/>
-              <!-- Top edge accent -->
-              <line x1="15" y1="9" x2="33" y2="9" stroke="#00fff7" stroke-width="2" opacity=".35"/>
-              <!-- Eye housing -->
-              <rect x="9" y="20" width="30" height="16" rx="1.2"
-                fill="#010b0f" stroke="#00fff7" stroke-width=".9"/>
-              <!-- Eye ambient fill -->
-              <rect x="11" y="22" width="26" height="12" rx=".5" fill="#00fff7" opacity=".05"/>
-              <!-- Scanning beam -->
-              <rect x="11" y="25" width="26" height="2" rx="1" fill="#00fff7" opacity=".92"
-                style="animation:hexScan 2s ease-in-out infinite"/>
-              <!-- Eye corner marks -->
-              <line x1="9" y1="22" x2="14" y2="22" stroke="#00fff7" stroke-width=".9" opacity=".55"/>
-              <line x1="9" y1="34" x2="14" y2="34" stroke="#00fff7" stroke-width=".9" opacity=".55"/>
-              <line x1="34" y1="22" x2="39" y2="22" stroke="#00fff7" stroke-width=".9" opacity=".55"/>
-              <line x1="34" y1="34" x2="39" y2="34" stroke="#00fff7" stroke-width=".9" opacity=".55"/>
-              <!-- Chin signal bars -->
-              <rect x="13" y="41" width="22" height="6" rx=".5" fill="#010b0f" stroke="#00fff7" stroke-width=".7"/>
-              <rect x="15" y="43.5" width="3" height="1.5" rx=".3" fill="#00fff7" style="animation:hexSig 1.1s .0s infinite alternate"/>
-              <rect x="20" y="43" width="3" height="2.5" rx=".3" fill="#00fff7" style="animation:hexSig 1.1s .2s infinite alternate"/>
-              <rect x="25" y="43.5" width="3" height="1.5" rx=".3" fill="#00fff7" style="animation:hexSig 1.1s .4s infinite alternate"/>
-              <rect x="30" y="43" width="3" height="2.5" rx=".3" fill="#00fff7" style="animation:hexSig 1.1s .2s infinite alternate"/>
-              <!-- Side circuit details -->
-              <line x1="0" y1="25" x2="5" y2="25" stroke="#00fff7" stroke-width=".9" opacity=".32"/>
-              <line x1="5" y1="25" x2="5" y2="31" stroke="#00fff7" stroke-width=".9" opacity=".2"/>
-              <line x1="43" y1="25" x2="48" y2="25" stroke="#00fff7" stroke-width=".9" opacity=".32"/>
-              <line x1="43" y1="25" x2="43" y2="31" stroke="#00fff7" stroke-width=".9" opacity=".2"/>
-            </svg>
-          </div>
-          <!-- Message -->
-          <div class="ai-msg-col">
-            <div class="aip">apex-ai:~$ <span id="aiMode">standby</span></div>
-            <div class="aio"><span class="aipc">►</span><span id="aiMsg">Systém pripravený...</span><span class="aic"></span></div>
-          </div>
-        </div>
-        <div class="ai-foot">
-          <div class="ai-sg"><span class="sdt sdt-g" id="dot1"></span>NEURAL</div>
-          <div class="ai-sg"><span class="sdt sdt-a" id="dot2"></span>DÁTA</div>
-          <div class="ai-sg"><span class="sdt sdt-g" id="dot3"></span>ZÁMOK</div>
+      <!-- ══ 1. ALL MARKETS AI DECISION PANEL (PRIMARY — always visible) ══ -->
+      <div id="allMarketsPanel" data-bsn="1" style="margin-bottom:8px">
+        <!-- Initial waiting state — replaced by _renderBestSignal() after lu() -->
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;
+                    padding:18px 14px;text-align:center">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--mut);
+               letter-spacing:2.5px;text-transform:uppercase;margin-bottom:10px">◈ AI DECISION TERMINAL</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#1e1e1e;
+               letter-spacing:1px">Vyber live zápas v ľavom paneli.<br>AI automaticky spustí analýzu.</div>
         </div>
       </div>
 
-      <!-- ALL MARKETS PANEL -->
-      <div id="allMarketsPanel" data-bsn="1" style="display:none;margin-bottom:8px"></div>
-
-      <!-- Signal Score -->
-      <div class="snum-b">
-        <div class="snum" id="snum">--</div>
-        <div class="slbl">SILA SIGNÁLU / 100</div>
+      <!-- ══ 2. AI Status strip (compact) ══ -->
+      <div class="aith" style="margin-bottom:8px;border:1px solid var(--border);border-radius:4px;
+                               background:var(--bg2);padding:6px 10px">
+        <div class="ai-id">APEX-AI v2.4</div>
+        <div class="ai-st sb" id="aiSt">◆ POHOTOVOSŤ</div>
+        <div style="display:flex;gap:3px">
+          <span class="sdt sdt-g" id="dot1"></span>
+          <span class="sdt sdt-a" id="dot2"></span>
+          <span class="sdt sdt-g" id="dot3"></span>
+        </div>
       </div>
 
-      <!-- Confidence -->
-      <div class="cf">
-        <div class="cfrow"><span class="cfl">SPOĽAHLIVOSŤ</span><span class="cfp" id="cfp">--%</span></div>
-        <div class="cfbg"><div class="cfbar" id="cfbar" style="width:0%"></div></div>
-      </div>
-
-      <!-- Prob badge -->
-      <div class="pbadge" id="pbadge"><span class="pb-dot"></span><span id="pbTxt">MEDIUM</span></div>
-
-      <!-- Verdict -->
-      <div class="vbox vs-sb" id="vbox">
-        <div class="vtxt" id="vtxt">POHOTOVOSŤ</div>
-        <div class="vsub" id="vsub">Zadaj dáta a spusti analýzu</div>
-      </div>
-
-      <!-- Stake row -->
-      <div class="strow" id="strow">
-        <div class="stchip"><div class="stl">Stávka</div><div class="stv" id="stakeV">—</div></div>
-        <div class="stchip"><div class="stl">Riziko</div><div class="stv" id="riskV">—</div></div>
-        <div class="stchip"><div class="stl">Market</div><div class="stv" id="mktV">—</div></div>
-      </div>
-
-      <!-- Score Breakdown -->
+      <!-- ══ 3. Score Breakdown (hidden until run() fires) ══ -->
       <div class="bdwrap" id="bdwrap">
-        <div class="bdt-hdr">// ROZKLAD SKÓRE</div>
+        <div class="bdt-hdr">// ROZKLAD SKÓRE — <span id="aiMode" style="color:var(--mut);font-size:9px">standby</span></div>
         <div class="bd-scroll"><div id="bdlist"></div></div>
         <div class="bd-sum">
           <span class="bd-sum-l">CELKOVÉ SKÓRE</span>
@@ -1112,7 +1045,12 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
         </div>
       </div>
 
-      <!-- AI Live Log -->
+      <!-- ══ 4. AI Message line (compact, visible) ══ -->
+      <div style="margin-bottom:6px;padding:0 2px">
+        <div class="aio"><span class="aipc">►</span><span id="aiMsg">Systém pripravený...</span><span class="aic"></span></div>
+      </div>
+
+      <!-- ══ 5. AI Live Log ══ -->
       <div class="ai-log-wrap" id="aiLogWrap">
         <div class="ai-log-hdr">// AI MONITOR LOG</div>
         <div class="ai-log-body" id="aiLogBody">
@@ -1120,8 +1058,60 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
         </div>
       </div>
 
+      <!-- ══ HIDDEN: functional elements updated by JS but not shown directly ══ -->
+      <!-- These keep all JS running without visible clutter in the panel -->
+      <div style="display:none">
+        <div class="snum-b"><div class="snum" id="snum">--</div><div class="slbl">SILA SIGNÁLU / 100</div></div>
+        <div class="cf"><div class="cfrow"><span class="cfl">SPOĽAHLIVOSŤ</span><span class="cfp" id="cfp">--%</span></div><div class="cfbg"><div class="cfbar" id="cfbar" style="width:0%"></div></div></div>
+        <div class="pbadge" id="pbadge"><span class="pb-dot"></span><span id="pbTxt">MEDIUM</span></div>
+        <div class="vbox vs-sb" id="vbox"><div class="vtxt" id="vtxt">POHOTOVOSŤ</div><div class="vsub" id="vsub">—</div></div>
+        <div class="strow" id="strow">
+          <div class="stchip"><div class="stl">Stávka</div><div class="stv" id="stakeV">—</div></div>
+          <div class="stchip"><div class="stl">Riziko</div><div class="stv" id="riskV">—</div></div>
+          <div class="stchip"><div class="stl">Market</div><div class="stv" id="mktV">—</div></div>
+        </div>
+        <!-- Full hex robot kept for zoom/clone contexts -->
+        <div class="ait" id="aitFull">
+          <div class="ai-body-row">
+            <div class="ai-svg-col">
+              <svg viewBox="0 0 48 58" fill="none" width="46" height="55">
+                <line x1="24" y1="0" x2="24" y2="9" stroke="#00fff7" stroke-width="1.1"/>
+                <circle cx="24" cy="2" r="1.7" fill="#00fff7" style="animation:hexBlink .9s infinite"/>
+                <polygon points="12,9 36,9 48,28 36,49 12,49 0,28" fill="#020c10" stroke="#00fff7" stroke-width="1.1"/>
+                <line x1="15" y1="9" x2="33" y2="9" stroke="#00fff7" stroke-width="2" opacity=".35"/>
+                <rect x="9" y="20" width="30" height="16" rx="1.2" fill="#010b0f" stroke="#00fff7" stroke-width=".9"/>
+                <rect x="11" y="22" width="26" height="12" rx=".5" fill="#00fff7" opacity=".05"/>
+                <rect x="11" y="25" width="26" height="2" rx="1" fill="#00fff7" opacity=".92" style="animation:hexScan 2s ease-in-out infinite"/>
+                <line x1="9" y1="22" x2="14" y2="22" stroke="#00fff7" stroke-width=".9" opacity=".55"/>
+                <line x1="9" y1="34" x2="14" y2="34" stroke="#00fff7" stroke-width=".9" opacity=".55"/>
+                <line x1="34" y1="22" x2="39" y2="22" stroke="#00fff7" stroke-width=".9" opacity=".55"/>
+                <line x1="34" y1="34" x2="39" y2="34" stroke="#00fff7" stroke-width=".9" opacity=".55"/>
+                <rect x="13" y="41" width="22" height="6" rx=".5" fill="#010b0f" stroke="#00fff7" stroke-width=".7"/>
+                <rect x="15" y="43.5" width="3" height="1.5" rx=".3" fill="#00fff7" style="animation:hexSig 1.1s .0s infinite alternate"/>
+                <rect x="20" y="43" width="3" height="2.5" rx=".3" fill="#00fff7" style="animation:hexSig 1.1s .2s infinite alternate"/>
+                <rect x="25" y="43.5" width="3" height="1.5" rx=".3" fill="#00fff7" style="animation:hexSig 1.1s .4s infinite alternate"/>
+                <rect x="30" y="43" width="3" height="2.5" rx=".3" fill="#00fff7" style="animation:hexSig 1.1s .2s infinite alternate"/>
+                <line x1="0" y1="25" x2="5" y2="25" stroke="#00fff7" stroke-width=".9" opacity=".32"/>
+                <line x1="5" y1="25" x2="5" y2="31" stroke="#00fff7" stroke-width=".9" opacity=".2"/>
+                <line x1="43" y1="25" x2="48" y2="25" stroke="#00fff7" stroke-width=".9" opacity=".32"/>
+                <line x1="43" y1="25" x2="43" y2="31" stroke="#00fff7" stroke-width=".9" opacity=".2"/>
+              </svg>
+            </div>
+            <div class="ai-msg-col">
+              <div class="aip">apex-ai:~$ <span id="aiModeFull">standby</span></div>
+            </div>
+          </div>
+          <div class="ai-foot">
+            <div class="ai-sg"><span class="sdt sdt-g"></span>NEURAL</div>
+            <div class="ai-sg"><span class="sdt sdt-a"></span>DÁTA</div>
+            <div class="ai-sg"><span class="sdt sdt-g"></span>ZÁMOK</div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
+
 
 </div><!-- /app -->
 
