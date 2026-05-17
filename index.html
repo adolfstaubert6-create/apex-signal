@@ -888,13 +888,14 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
           AI PREBERÁ ANALÝZU ZÁPASU
         </div>
 
-        <!-- Change match link -->
-        <div onclick="_deactivateAI()"
+        <!-- Change match link — opens overlay, does NOT deactivate AI -->
+        <div onclick="openMatchOverlay()"
           style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--mut);
-                 letter-spacing:1px;cursor:pointer;margin-bottom:10px;transition:color .15s"
+                 letter-spacing:1px;cursor:pointer;margin-bottom:10px;transition:color .15s;
+                 display:flex;align-items:center;gap:5px"
           onmouseover="this.style.color='var(--c)'"
           onmouseout="this.style.color='var(--mut)'">
-          ← zmeniť zápas
+          ⟳ ZMENIŤ ZÁPAS
         </div>
       </div>
 
@@ -1616,44 +1617,86 @@ function _selectMatchFromOverlay(id){
   closeMatchOverlay();
   const match=_allLiveMatches.find(m=>String(m.id)===id);
   if(!match)return;
-  // Pre-fill team names and score so active panel shows correctly
-  const h=document.getElementById('home'),a=document.getElementById('away');
-  const sH=document.getElementById('scoreH'),sA=document.getElementById('scoreA'),min=document.getElementById('minute');
-  if(h) h.value=match.home||'';
-  if(a) a.value=match.away||'';
-  if(sH) sH.value=match.scoreH??0;
-  if(sA) sA.value=match.scoreA??0;
-  if(min) min.value=match.minute||45;
-  _activateAI();
-  // Only call real selectMatch for non-demo matches
-  if(!match._demo){
-    const ms=document.getElementById('matchSelect');
-    if(ms) ms.value=id;
-    selectMatch(id);
-  } else {
-    lu(); // run AI analysis with pre-filled demo data
-    console.log('[demo match selected]', match.home, 'vs', match.away);
-  }
+
+  // ── STEP 1: Show panels immediately with loading state ──
+  const searchPanel=document.getElementById('matchSearchPanel');
+  const activePanel=document.getElementById('matchActivePanel');
+  const sysPanel=document.getElementById('systemStatusPanel');
+  if(searchPanel) searchPanel.style.display='none';
+  if(activePanel) activePanel.style.display='block';
+  if(sysPanel)    sysPanel.style.display='block';
+
+  // Show match name right away, score loading dashes
+  const nameEl=document.getElementById('liveMatchName');
+  const dH=document.getElementById('dispScoreH'),dA=document.getElementById('dispScoreA'),dM=document.getElementById('dispMinute');
+  if(nameEl){nameEl.textContent=match.home+' vs '+match.away;nameEl.style.color='rgba(0,255,247,.6)';}
+  if(dH){dH.textContent='—';dH.style.color='var(--mut)';}
+  if(dA){dA.textContent='—';dA.style.color='var(--mut)';}
+  if(dM){dM.textContent='—';dM.style.color='var(--mut)';}
+
+  // Status: NAČÍTAVAM...
+  const statusEl=document.getElementById('activationStatus');
+  if(statusEl){statusEl.textContent='NAČÍTAVAM ŽIVÉ DÁTA...';statusEl.style.color='var(--c)';}
+  const badge=document.getElementById('lBadge');
+  if(badge){badge.textContent='NAČÍTAVAM';badge.style.color='var(--c)';}
+
+  // ── STEP 2: After 1s — fill real data, run AI ──
+  setTimeout(()=>{
+    // Fill inputs
+    const h=document.getElementById('home'),a=document.getElementById('away');
+    const sH=document.getElementById('scoreH'),sA=document.getElementById('scoreA'),min=document.getElementById('minute');
+    if(h) h.value=match.home||'';
+    if(a) a.value=match.away||'';
+    if(sH) sH.value=match.scoreH??0;
+    if(sA) sA.value=match.scoreA??0;
+    if(min) min.value=match.minute||45;
+
+    // Activate AI (handles both first-time and match-change)
+    _activateAI(true);
+
+    // Load live stats or run demo analysis
+    if(!match._demo){
+      const ms=document.getElementById('matchSelect');
+      if(ms) ms.value=id;
+      selectMatch(id);
+    }else{
+      lu();
+      console.log('[demo match]', match.home, 'vs', match.away);
+    }
+  }, 1000);
 }
 
 // Legacy alias (still referenced by old fetchLiveMatches path)
 function _selectMatchFromList(id){_selectMatchFromOverlay(id);}
 function _filterMatches(q){_renderOverlayCards(q);}
 
-function _activateAI(){
-  if(_aiActivated)return;
+function _activateAI(isMatchChange){
+  const wasActive=_aiActivated;
   _aiActivated=true;
   const searchPanel=document.getElementById('matchSearchPanel');
   const activePanel=document.getElementById('matchActivePanel');
   const sysPanel=document.getElementById('systemStatusPanel');
   const btn=document.getElementById('rbtn');
   const badge=document.getElementById('lBadge');
-  if(searchPanel)searchPanel.style.display='none';
-  if(activePanel)activePanel.style.display='block';
-  if(sysPanel)sysPanel.style.display='block';
+
+  // Show panels (panels may already be visible on match-change)
+  if(searchPanel) searchPanel.style.display='none';
+  if(activePanel) activePanel.style.display='block';
+  if(sysPanel)    sysPanel.style.display='block';
   if(btn){btn.textContent='● AI AKTÍVNA';btn.style.borderColor='rgba(0,255,136,.4)';btn.style.color='var(--g)';}
   if(badge){badge.textContent='AKTÍVNA';badge.style.color='var(--g)';}
-  _runActivationSequence();
+
+  if(isMatchChange&&wasActive){
+    // Match change: short confirmation, not the full 3-step boot sequence
+    const statusEl=document.getElementById('activationStatus');
+    if(statusEl){
+      statusEl.textContent='NOVÝ ZÁPAS NAČÍTANÝ';
+      statusEl.style.color='var(--c)';
+      setTimeout(()=>{statusEl.textContent='AI AKTIVOVANÉ';statusEl.style.color='#00ff88';},600);
+    }
+  }else{
+    _runActivationSequence();
+  }
   _updateSystemStatus(true);
 }
 
@@ -1748,8 +1791,8 @@ function _updateLiveCard(){
   const cardEl=document.getElementById('liveMatchCard');
   if(cardEl&&home){cardEl.style.borderColor=best?(VERDICT_COLOR[best.verdict]||'var(--bd)')+'44':'rgba(0,255,247,.18)';}
 
-  // Activate if match loaded but panel not yet activated
-  if(home&&away&&!_aiActivated)_activateAI();
+  // Auto-activate only when live fixture data arrives (not on manual demo selection)
+  if(home&&away&&!_aiActivated&&liveFixtureId)_activateAI();
 }
 
 
