@@ -18,8 +18,18 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: CORS, body: '' };
   if (event.httpMethod !== 'POST')    return { statusCode: 405, headers: CORS, body: JSON.stringify({ error: 'Method not allowed' }) };
 
-  const API_KEY = process.env.ANTHROPIC_API_KEY;
+  const API_KEY     = process.env.ANTHROPIC_API_KEY;
+  const CHAT_SECRET = process.env.APEX_CHAT_SECRET;
+
   if (!API_KEY) return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: 'Chýba ANTHROPIC_API_KEY' }) };
+
+  // If APEX_CHAT_SECRET is set in Netlify ENV, require matching Authorization header
+  if (CHAT_SECRET) {
+    const auth = event.headers?.authorization || event.headers?.Authorization || '';
+    if (auth !== `Bearer ${CHAT_SECRET}`) {
+      return { statusCode: 401, headers: CORS, body: JSON.stringify({ error: 'Unauthorized' }) };
+    }
+  }
 
   let body;
   try { body = JSON.parse(event.body || '{}'); }

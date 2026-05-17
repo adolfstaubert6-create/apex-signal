@@ -2240,7 +2240,9 @@ async function sendChat(){
       messages:[{role:'user',content:`Tiket: ${JSON.stringify(currentTicket||[])}\n\nOtázka: ${msg}`}]
     };
 
-    const res=await fetch('/.netlify/functions/ai-chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const chatHeaders={'Content-Type':'application/json'};
+    if(window.APEX_CHAT_SECRET)chatHeaders['Authorization']='Bearer '+window.APEX_CHAT_SECRET;
+    const res=await fetch('/.netlify/functions/ai-chat',{method:'POST',headers:chatHeaders,body:JSON.stringify(body)});
     const data=await res.json();
 
     // Remove typing indicator
@@ -2276,6 +2278,9 @@ function applyAiChange(){
   if(btn)btn.classList.remove('visible');
   pendingAiChange=null;
 }
+
+// ── CHAT SECRET (set window.APEX_CHAT_SECRET to match Netlify APEX_CHAT_SECRET env) ──
+// window.APEX_CHAT_SECRET = 'your-secret-here'; // inject at deploy time or leave unset
 
 // ── VISIBILITY GUARD ──
 // Pause rAF loop and skip live polling when tab is hidden to protect API quota.
