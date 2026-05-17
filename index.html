@@ -1990,9 +1990,8 @@ function _renderBSNZoom(el){
   function mkBar(score){
     if(!score||score<=0)return'';
     const c=score>=80?'#00ff88':score>=60?'#00d4ff':score>=30?'#ffb300':'#ff2d55';
-    const glow=score>=60?'box-shadow:0 0 5px '+c+'60':'';
-    return`<div style="flex:1;height:4px;background:#151515;border-radius:2px;overflow:hidden;position:relative">
-      <div style="height:100%;width:${score}%;background:${c};border-radius:2px;${glow};transition:width .5s"></div>
+    return`<div style="height:3px;background:#151515;border-radius:2px;overflow:hidden;position:relative;margin-top:5px">
+      <div style="height:100%;width:${score}%;background:${c};border-radius:2px"></div>
       <div style="position:absolute;top:0;bottom:0;left:30%;width:1px;background:#1e1e1e"></div>
       <div style="position:absolute;top:0;bottom:0;left:60%;width:1px;background:#1e1e1e"></div>
       <div style="position:absolute;top:0;bottom:0;left:80%;width:1px;background:#1e1e1e"></div>
@@ -2000,42 +1999,11 @@ function _renderBSNZoom(el){
   }
   function tierLabel(score){
     if(!score||score<=0)return'';
-    const t=score>=80?['ENTRY','#00ff88']:score>=60?['SILNÉ','#00d4ff']:score>=30?['MONITOR','#ffb300']:['SLABÉ','#ff2d55'];
-    return`<span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:${t[1]};letter-spacing:.4px;flex-shrink:0">${t[0]}</span>`;
+    const t=score>=80?['VSTUP','#00ff88']:score>=60?['SILNÉ','#00d4ff']:score>=30?['MONITOR','#ffb300']:['SLABÉ','#ff2d55'];
+    return`<span style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:${t[1]};letter-spacing:.3px">${t[0]}</span>`;
   }
 
-  // ── NAJLEPŠÍ SIGNÁL TERAZ ──
-  let bsnSection;
-  const hdrLabel='<div style="font-family:\'IBM Plex Mono\',monospace;font-size:9px;color:#3a5a5a;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:14px">◈ NAJLEPŠÍ SIGNÁL TERAZ</div>';
-  if(!best){
-    const whys=reasonLines.slice(0,4).map(l=>`<div style="display:flex;gap:8px;margin-bottom:6px"><span style="color:#3a3a3a;flex-shrink:0;margin-top:1px">•</span><span style="font-size:11px;color:#5a5a5a;line-height:1.5">${l}</span></div>`).join('');
-    bsnSection=hdrLabel+
-      `<div style="font-family:'IBM Plex Mono',monospace;font-size:16px;color:#444;letter-spacing:1.5px;margin-bottom:14px">❌ ŽIADNY SILNÝ EDGE</div>
-       <div style="background:#0a0a0c;border:1px solid #1a1a1a;border-radius:5px;padding:13px 15px">
-         <div style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:#333;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:9px">DÔVOD:</div>
-         ${whys}
-       </div>`;
-  }else{
-    const bc=vColZ(best.verdict,false);
-    const reason=(best.reasons||[]).find(r=>r&&r.length>4&&!r.startsWith('Cas:')&&!r.startsWith('⏱'))||'';
-    const pulse=(best.verdict==='HIGH ALERT'||best.verdict==='ENTER')?'animation:bsnScorePulse 2.5s ease-in-out infinite':'';
-    const glow=best.verdict==='HIGH ALERT'?'text-shadow:0 0 30px rgba(255,255,255,.45)':best.verdict==='ENTER'?'text-shadow:0 0 22px rgba(0,255,136,.38)':'';
-    bsnSection=hdrLabel+
-      `<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:12px">
-         <div style="flex:1;min-width:0">
-           <div style="font-family:'Orbitron',sans-serif;font-size:19px;font-weight:700;color:${bc};letter-spacing:.3px;margin-bottom:6px">${MKT_ICON[best.market]}&nbsp;${MKT[best.market]}</div>
-           <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:${bc};letter-spacing:1.5px;margin-bottom:12px">${best.verdict}</div>
-           <div style="display:flex;align-items:center;gap:10px">${mkBar(best.score)}${tierLabel(best.score)}</div>
-         </div>
-         <div style="text-align:right;flex-shrink:0">
-           <div style="font-family:'IBM Plex Mono',monospace;font-size:56px;font-weight:700;color:${bc};line-height:1;${glow};${pulse}">${best.score}</div>
-           <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#3a3a3a">/100</div>
-         </div>
-       </div>
-       ${reason?`<div style="font-size:12px;color:#8a8a8a;line-height:1.65;border-left:2px solid ${bc};padding-left:12px;margin-bottom:2px">${reason}</div>`:''}`;
-  }
-
-  // ── LIVE AI REASONING ──
+  // ── Velocity bits ──
   const velBits=vel?function(){
     const up=[],dn=[];
     if(vel.xg>=0.15)up.push('xG');     else if(vel.xg<=-0.15)dn.push('xG');
@@ -2045,29 +2013,54 @@ function _renderBSNZoom(el){
     const p=[];
     if(up.length)p.push('<span style="color:#00cc66">↑ '+up.join(', ')+'</span>');
     if(dn.length)p.push('<span style="color:rgba(255,45,85,.6)">↓ '+dn.join(', ')+'</span>');
-    return p.join(' &nbsp;');
+    return p.length?p.join(' &nbsp;'):'';
   }():'';
-  const aiLines=reasonLines.slice(0,3).map(l=>`<div style="margin-bottom:5px;line-height:1.6">${l}</div>`).join('');
-  const watchStr=watching.slice(0,5).join(' · ');
-  const aiBox=`
-    <div style="background:#050c10;border:1px solid rgba(0,212,255,.1);border-radius:5px;padding:14px 16px;margin-bottom:6px;position:relative;overflow:hidden">
-      <div style="position:absolute;top:0;left:-100%;width:55%;height:1px;background:linear-gradient(90deg,transparent,rgba(0,212,255,.28),transparent);animation:bsnScanLine 5s linear infinite"></div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px">
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#00d4ff;letter-spacing:2px;text-transform:uppercase">AI ANALÝZA</div>
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:#1e3a3a">${new Date().toTimeString().slice(0,8)}</div>
+
+  // ── LEFT COL: NAJLEPŠÍ SIGNÁL TERAZ ──
+  let bsnLeft;
+  if(!best){
+    const whys=reasonLines.slice(0,3).map(l=>`<div style="display:flex;gap:6px;margin-bottom:4px"><span style="color:#3a3a3a;flex-shrink:0">•</span><span style="font-size:10px;color:#555;line-height:1.4">${l}</span></div>`).join('');
+    bsnLeft=`
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#3a3a3a;letter-spacing:1px;margin-bottom:8px">❌ ŽIADNY SILNÝ EDGE</div>
+      ${whys}`;
+  }else{
+    const bc=vColZ(best.verdict,false);
+    const pulse=(best.verdict==='HIGH ALERT'||best.verdict==='ENTER')?'animation:bsnScorePulse 2.5s ease-in-out infinite':'';
+    const glow=best.verdict==='HIGH ALERT'?'text-shadow:0 0 22px rgba(255,255,255,.4)':best.verdict==='ENTER'?'text-shadow:0 0 16px rgba(0,255,136,.35)':'';
+    const verdictLabel=best.verdict==='HIGH ALERT'?'ALARM!':best.verdict==='ENTER'?'VSTÚPIŤ':best.verdict==='WAIT'?'POČKAŤ':best.verdict==='WATCH'?'SLEDOVAŤ':'NESTÁVKOVAŤ';
+    bsnLeft=`
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">
+        <div style="flex:1;min-width:0">
+          <div style="font-family:'Orbitron',sans-serif;font-size:14px;font-weight:700;color:${bc};letter-spacing:.2px;margin-bottom:3px">${MKT_ICON[best.market]}&nbsp;${MKT[best.market]}</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:${bc};letter-spacing:1.2px;margin-bottom:6px">${verdictLabel}</div>
+          ${mkBar(best.score)}
+          <div style="margin-top:3px">${tierLabel(best.score)}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:42px;font-weight:700;color:${bc};line-height:1;${glow};${pulse}">${best.score}</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#333">/100</div>
+        </div>
+      </div>`;
+  }
+
+  // ── RIGHT COL: AI ANALÝZA ──
+  const aiLines=reasonLines.slice(0,3).map(l=>`<div style="margin-bottom:3px;line-height:1.45;color:#7a7a7a">${l}</div>`).join('');
+  const watchStr=watching.slice(0,4).join(' · ');
+  const aiRight=`
+    <div style="background:#050c10;border:1px solid rgba(0,212,255,.1);border-radius:4px;padding:8px 12px;height:100%;box-sizing:border-box;position:relative;overflow:hidden">
+      <div style="position:absolute;top:0;left:-100%;width:55%;height:1px;background:linear-gradient(90deg,transparent,rgba(0,212,255,.25),transparent);animation:bsnScanLine 5s linear infinite"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:#00d4ff;letter-spacing:2px;text-transform:uppercase">AI ANALÝZA</div>
+        <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#00d4ff;animation:bsnCursor 1s steps(1) infinite">▋</span>
       </div>
-      <div style="font-size:11px;color:#7a7a7a;line-height:1.7;margin-bottom:${watching.length?10:0}px">
-        ${aiLines}
-        ${velBits?`<div style="margin-top:5px">${velBits} <span style="color:#1e3a3a">momentum</span></div>`:''}
-      </div>
-      ${watching.length?`<div style="border-top:1px solid #0d1a1a;padding-top:9px">
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:#1e3a3a;letter-spacing:1px;margin-bottom:5px">AI SLEDUJE:</div>
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#2a5a5a">${watchStr}</div>
+      <div style="font-size:10px;line-height:1.45;margin-bottom:${watching.length?5:0}px">${aiLines}${velBits?`<div style="margin-top:3px;font-size:9px">${velBits}</div>`:''}</div>
+      ${watching.length?`<div style="border-top:1px solid #0d1a1a;padding-top:5px">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:7px;color:#1e3a3a;letter-spacing:1px;margin-bottom:3px">SLEDUJEM:</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:#2a5a5a">${watchStr}</div>
       </div>`:''}
-      <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#00d4ff;animation:bsnCursor 1s steps(1) infinite;display:inline-block;margin-top:4px">▋</span>
     </div>`;
 
-  // ── ALL MARKETS ──
+  // ── ALL MARKETS compact rows ──
   const rowsHtml=all.map(d=>{
     const v=d.verdict;
     const col=vColZ(v,d.invalidated);
@@ -2077,25 +2070,23 @@ function _renderBSNZoom(el){
     const nameCol=d.invalidated?'#2a2a2a':d.score<36?'#5a5a5a':'#b0b0b0';
     const rowBg=isBest?`rgba(${v==='HIGH ALERT'?'255,255,255':v==='ENTER'?'0,255,136':v==='WAIT'?'255,179,0':v==='WATCH'?'0,212,255':'120,120,120'},.04)`:'rgba(255,255,255,.01)';
     const borderL=isBest?`2px solid ${col}`:'2px solid #111';
-    const reason=(!d.invalidated&&d.score>=36)?((d.reasons||[]).find(r=>r&&r.length>4&&!r.startsWith('Cas:'))||''):'';
-    return`<div style="padding:9px 11px;border-radius:4px;background:${rowBg};border-left:${borderL};margin-bottom:5px">
-  <div style="display:flex;align-items:center;gap:8px">
-    <span style="font-size:14px;flex-shrink:0;width:22px;opacity:${d.invalidated?.2:1}">${MKT_ICON[d.market]}</span>
-    <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:${nameCol};flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${MKT[d.market]}</span>
-    ${!d.invalidated&&d.score>0?`<div style="width:64px;flex-shrink:0">${mkBar(d.score)}</div>`:''}
-    <span style="font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;color:${col};width:26px;text-align:right;flex-shrink:0">${scoreStr}</span>
-    <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:${col};width:58px;text-align:right;flex-shrink:0;letter-spacing:.2px">${vLabel}</span>
-  </div>
-  ${reason?`<div style="font-size:10px;color:#3a3a3a;padding:4px 0 0 30px;line-height:1.45">${reason}</div>`:''}
+    return`<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:3px;background:${rowBg};border-left:${borderL};margin-bottom:3px">
+  <span style="font-size:12px;flex-shrink:0;width:18px;opacity:${d.invalidated?.2:1}">${MKT_ICON[d.market]}</span>
+  <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:${nameCol};flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${MKT[d.market]}</span>
+  ${!d.invalidated&&d.score>0?`<div style="width:52px;flex-shrink:0">${mkBar(d.score)}</div>`:''}
+  <span style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;color:${col};width:24px;text-align:right;flex-shrink:0">${scoreStr}</span>
+  <span style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:${col};width:66px;text-align:right;flex-shrink:0;letter-spacing:.2px">${vLabel}</span>
 </div>`;
   }).join('');
 
   el.innerHTML=`
-    ${bsnSection}
-    <div style="height:1px;background:#111;margin:14px 0 14px"></div>
-    ${aiBox}
-    <div style="height:1px;background:#111;margin:14px 0 12px"></div>
-    <div style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:#2a3a3a;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px">// VŠETKY SITUÁCIE</div>
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:7px;color:#2a4a4a;letter-spacing:2.5px;text-transform:uppercase;margin-bottom:8px">◈ NAJLEPŠÍ SIGNÁL TERAZ</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+      <div>${bsnLeft}</div>
+      <div>${aiRight}</div>
+    </div>
+    <div style="height:1px;background:#111;margin-bottom:8px"></div>
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:7px;color:#2a3a3a;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px">// VŠETKY SITUÁCIE</div>
     ${rowsHtml}`;
 }
 
@@ -3209,7 +3200,7 @@ requestAnimationFrame(()=>{initGraph();});
 
     <!-- Modal scrollable body -->
     <div id="bsnModalBody"
-      style="flex:1;overflow-y:auto;padding:24px 28px;
+      style="flex:1;overflow-y:auto;padding:14px 18px;
              scrollbar-width:thin;scrollbar-color:rgba(0,255,247,.18) transparent">
     </div>
 
