@@ -1485,17 +1485,33 @@ let _aiActivated=false;
 
 function escHtmlL(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
+// Demo fallback: shown when API key missing or no live matches
+const _DEMO_MATCHES=[
+  {id:'demo-1',home:'Arsenal',away:'Chelsea',scoreH:1,scoreA:1,minute:67,league:'Premier League · England',_demo:true},
+  {id:'demo-2',home:'Real Madrid',away:'Barcelona',scoreH:0,scoreA:0,minute:34,league:'La Liga · Spain',_demo:true},
+  {id:'demo-3',home:'Dortmund',away:'Leverkusen',scoreH:2,scoreA:1,minute:78,league:'Bundesliga · Germany',_demo:true},
+  {id:'demo-4',home:'PSG',away:'Marseille',scoreH:1,scoreA:0,minute:52,league:'Ligue 1 · France',_demo:true},
+  {id:'demo-5',home:'Inter Miláno',away:'AC Miláno',scoreH:0,scoreA:0,minute:23,league:'Serie A · Italy',_demo:true},
+];
+
 function _updateMatchList(matches){
-  _allLiveMatches=matches||[];
+  const real=matches||[];
+  _allLiveMatches=real.length?real:_DEMO_MATCHES;
+  console.log('[_updateMatchList] real:',real.length,'showing:',_allLiveMatches.length,(real.length?'':'→ DEMO fallback'));
+
   // Update button status text
   const st=document.getElementById('lvStatus');
   if(st){
-    if(!matches||!matches.length) st.textContent='žiadne live zápasy';
-    else st.textContent=matches.length+' live zápasov práve teraz';
+    if(real.length)  st.textContent=real.length+' live zápasov práve teraz';
+    else             st.textContent='DEMO — žiadne live zápasy';
   }
   // Refresh overlay if open
   const overlay=document.getElementById('matchOverlay');
-  if(overlay&&overlay.style.display!=='none') _renderOverlayCards(document.getElementById('overlaySearch')?.value||'');
+  if(overlay&&overlay.style.display!=='none'){
+    _renderOverlayCards(document.getElementById('overlaySearch')?.value||'');
+    const os=document.getElementById('overlayStatus');
+    if(os) os.textContent=real.length?(real.length+' live zápasov'):'DEMO — žiadne live dáta';
+  }
 }
 
 function openMatchOverlay(){
@@ -1505,10 +1521,11 @@ function openMatchOverlay(){
   document.body.style.overflow='hidden';
   const searchEl=document.getElementById('overlaySearch');
   if(searchEl){searchEl.value='';setTimeout(()=>searchEl.focus(),120);}
+  console.log('[overlay] opened. cached matches:', _allLiveMatches.length);
+  // Render whatever we have immediately
   _renderOverlayCards('');
-  // Update overlay status
-  const os=document.getElementById('overlayStatus');
-  if(os) os.textContent=_allLiveMatches.length?_allLiveMatches.length+' live zápasov':'načítavam...';
+  // Always trigger a fresh fetch — re-render will fire via _updateMatchList
+  if(!_fetchingMatches) fetchLiveMatches();
 }
 
 function closeMatchOverlay(){
@@ -1529,13 +1546,18 @@ function _renderOverlayCards(q){
     ?_allLiveMatches.filter(m=>[m.home,m.away,m.league||''].some(s=>s.toLowerCase().includes(ql)))
     :_allLiveMatches;
 
+  console.log('[_renderOverlayCards] q="'+q+'" filtered:'+filtered.length+' of '+_allLiveMatches.length);
+
   if(!filtered.length){
-    const msg=_allLiveMatches.length?'Žiadne zhody pre "'+q+'"':'Žiadne live zápasy momentálne';
+    const msg=_allLiveMatches.length?'Žiadne zhody pre "'+q+'"':'Načítavam live zápasy...';
     list.innerHTML=`<div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#1a2a2a;text-align:center;padding:52px 24px">${msg}</div>`;
     return;
   }
 
-  list.innerHTML=filtered.map(m=>{
+  const isAllDemo=filtered.every(m=>m._demo);
+
+  list.innerHTML=(isAllDemo?`<div style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:#2a4a2a;letter-spacing:2px;text-transform:uppercase;padding:10px 24px 6px;border-bottom:1px solid #09131a">[ DEMO — nastavte API_FOOTBALL_KEY pre live dáta ]</div>`:'')
+  +filtered.map(m=>{
     const id=String(m.id);
     // Split league: "Premier League · England" → liga / krajina
     const parts=(m.league||'').split('·').map(s=>s.trim());
@@ -1602,10 +1624,26 @@ function _renderOverlayCards(q){
 
 function _selectMatchFromOverlay(id){
   closeMatchOverlay();
-  const ms=document.getElementById('matchSelect');
-  if(ms)ms.value=id;
+  const match=_allLiveMatches.find(m=>String(m.id)===id);
+  if(!match)return;
+  // Pre-fill team names and score so active panel shows correctly
+  const h=document.getElementById('home'),a=document.getElementById('away');
+  const sH=document.getElementById('scoreH'),sA=document.getElementById('scoreA'),min=document.getElementById('minute');
+  if(h) h.value=match.home||'';
+  if(a) a.value=match.away||'';
+  if(sH) sH.value=match.scoreH??0;
+  if(sA) sA.value=match.scoreA??0;
+  if(min) min.value=match.minute||45;
   _activateAI();
-  selectMatch(id);
+  // Only call real selectMatch for non-demo matches
+  if(!match._demo){
+    const ms=document.getElementById('matchSelect');
+    if(ms) ms.value=id;
+    selectMatch(id);
+  } else {
+    lu(); // run AI analysis with pre-filled demo data
+    console.log('[demo match selected]', match.home, 'vs', match.away);
+  }
 }
 
 // Legacy alias (still referenced by old fetchLiveMatches path)
@@ -2637,43 +2675,41 @@ async function fetchLiveMatches(){
   _fetchingMatches=true;
   const sel=document.getElementById('matchSelect');
   const st=document.getElementById('lvStatus');
-  st.innerHTML='<span class="lv-dot"></span>Načítavam live zápasy...';
+  if(st) st.innerHTML='<span class="lv-dot"></span>Načítavam...';
+  console.log('[fetchLiveMatches] starting fetch...');
   try{
     const res=await fetch('/.netlify/functions/get-live-matches');
+    console.log('[fetchLiveMatches] HTTP status:', res.status);
     if(!res.ok) throw new Error(`HTTP ${res.status}`);
     const data=await res.json();
+    console.log('[fetchLiveMatches] response:', JSON.stringify(data).slice(0,300));
 
-    // API-level error (limit, bad key, etc.)
+    // API-level error (no key, rate limit, etc.)
     if(data.apiError){
+      console.warn('[fetchLiveMatches] apiError:', data.apiError);
       if(data.limitExceeded){
-        sel.innerHTML='<option value="">⚠ Denný limit API vyčerpaný</option>';
-        st.textContent='API-Football: denný limit vyčerpaný. Obnova o polnoci.';
-      } else {
-        sel.innerHTML=`<option value="">⚠ API chyba</option>`;
-        st.textContent='API chyba: '+data.apiError.slice(0,70);
+        if(st) st.textContent='API limit vyčerpaný. Obnova o polnoci.';
+      }else{
+        if(st) st.textContent='API chyba: '+data.apiError.slice(0,50);
       }
       aiLog('Live API: '+data.apiError.slice(0,60),'err');
+      _updateMatchList([]); // triggers demo fallback
       return;
     }
 
     const ms=data.matches||[];
-    const prev=sel.value;
-    // Keep hidden select in sync (used internally)
-    sel.innerHTML='<option value="">—</option>'+ms.map(m=>`<option value="${m.id}">${m.home} vs ${m.away}</option>`).join('');
-    if(prev&&ms.find(m=>String(m.id)===prev))sel.value=prev;
-    // Update custom visual match list
-    _updateMatchList(ms);
-    if(ms.length===0){
-      const t=new Date().toTimeString().slice(0,5);
-      st.textContent=`Žiadne live zápasy · ${t} · retry za 30s`;
-    }else{
-      const t=new Date().toTimeString().slice(0,5);
-      st.textContent=`${ms.length} live zápasov · ${t}`;
+    console.log('[fetchLiveMatches] matches received:', ms.length);
+    const prev=sel?sel.value:'';
+    if(sel){
+      sel.innerHTML='<option value="">—</option>'+ms.map(m=>`<option value="${m.id}">${m.home} vs ${m.away}</option>`).join('');
+      if(prev&&ms.find(m=>String(m.id)===prev))sel.value=prev;
     }
+    _updateMatchList(ms); // populates overlay + button status
   }catch(e){
-    const msg=e.message||'Neznáma chyba';
-    st.textContent='Chyba: '+msg.slice(0,60);
-    sel.innerHTML=`<option value="">✕ ${msg.slice(0,40)}</option>`;
+    console.error('[fetchLiveMatches] error:', e.message);
+    if(st) st.textContent='Chyba: '+e.message.slice(0,50);
+    if(sel) sel.innerHTML='<option value="">✕ chyba</option>';
+    _updateMatchList([]); // triggers demo fallback
   }finally{
     _fetchingMatches=false;
   }
