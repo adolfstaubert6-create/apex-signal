@@ -1328,7 +1328,15 @@ function runLog(cb){
 }
 
 // ── HISTORY ──
-function loadSigs(){try{return JSON.parse(localStorage.getItem(LS)||'[]');}catch{return[];}}
+function _sigId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,5);}
+function loadSigs(){
+  try{
+    const arr=JSON.parse(localStorage.getItem(LS)||'[]');
+    // Back-fill IDs for legacy entries saved before this fix
+    arr.forEach((s,i)=>{if(!s.id)s.id='l'+i+_sigId();});
+    return arr;
+  }catch{return[];}
+}
 function saveSigs(a){try{localStorage.setItem(LS,JSON.stringify(a.slice(0,300)));}catch{}}
 let sigs=loadSigs();
 const MAX_SIGNALS=300;
@@ -1363,13 +1371,13 @@ function renderHistory(){
   const c=document.getElementById('hCards');
   if(!sigs.length){c.innerHTML='<div class="h-empty">[ žiadne záznamy — spusti analýzu ]</div>';return;}
   c.innerHTML='';
-  sigs.slice(0,50).forEach((s,i)=>{
+  sigs.slice(0,50).forEach(s=>{
+    const id  =s.id;
     const card=document.createElement('div');
     const vCls=s.v==='VSTÚPIŤ'?'hv':s.v==='POČKAŤ'?'ha':'hr';
     const bc  =s.v==='VSTÚPIŤ'?'bv':s.v==='POČKAŤ'?'ba':'br';
     const col =s.v==='VSTÚPIŤ'?'var(--g)':s.v==='POČKAŤ'?'var(--a)':'var(--r)';
     const res =s.result||'NOT_SET';
-    // Left-border glow by ROI result
     const roiCls=res==='WIN'?'roi-win':res==='LOSS'?'roi-loss':res==='VOID'?'roi-void':'roi-ns';
     const wa=res==='WIN'?'act':'',la=res==='LOSS'?'act':'',xa=res==='VOID'?'act':'';
     let plHtml='';
@@ -1379,7 +1387,7 @@ function renderHistory(){
     }
     card.className=`hcard ${vCls} ${roiCls}`;
     card.innerHTML=`
-      <button class="hc-del" onclick="deleteSig(${i})" title="Vymazať">✕</button>
+      <button class="hc-del" onclick="deleteSig('${id}')" title="Vymazať">✕</button>
       <div class="hc-m">${s.home||'?'} vs ${s.away||'?'}</div>
       <div class="hc-meta">${s.mkt} · ${s.sH}:${s.sA} · ${s.min}' · ${(s.mode||'bal').toUpperCase()} · ${s.time}</div>
       <div class="hc-row" style="margin-bottom:4px">
@@ -1387,14 +1395,14 @@ function renderHistory(){
         <span class="hc-b ${bc}">${s.v}</span>
       </div>
       <div class="hc-roi">
-        <input class="hc-inp" id="sa${i}" type="number" placeholder="Stake€" value="${s.stakeAmt||''}" min="0" step="0.5" onblur="saveField(${i})"/>
-        <input class="hc-inp" id="od${i}" type="number" placeholder="Odds" value="${s.odds||''}" min="1.01" step="0.05" onblur="saveField(${i})"/>
-        <button class="hcbtn w ${wa}" onclick="setResult(${i},'WIN')">WIN</button>
-        <button class="hcbtn l ${la}" onclick="setResult(${i},'LOSS')">LOSS</button>
-        <button class="hcbtn x ${xa}" onclick="setResult(${i},'VOID')">VOID</button>
+        <input class="hc-inp" id="sa-${id}" type="number" placeholder="Stake€" value="${s.stakeAmt||''}" min="0" step="0.5" onblur="saveField('${id}')"/>
+        <input class="hc-inp" id="od-${id}" type="number" placeholder="Odds" value="${s.odds||''}" min="1.01" step="0.05" onblur="saveField('${id}')"/>
+        <button class="hcbtn w ${wa}" onclick="setResult('${id}','WIN')">WIN</button>
+        <button class="hcbtn l ${la}" onclick="setResult('${id}','LOSS')">LOSS</button>
+        <button class="hcbtn x ${xa}" onclick="setResult('${id}','VOID')">VOID</button>
         ${plHtml}
       </div>
-      <input class="hc-note-i" id="nt${i}" placeholder="poznámka..." value="${(s.note||'').replace(/"/g,'&quot;')}" onblur="saveField(${i})"/>`;
+      <input class="hc-note-i" id="nt-${id}" placeholder="poznámka..." value="${(s.note||'').replace(/"/g,'&quot;')}" onblur="saveField('${id}')"/>`;
     c.appendChild(card);
   });
 }
@@ -1406,13 +1414,15 @@ function clearHistory(){
   sigs=[];saveSigs(sigs);refreshCounts();renderHistory();renderPerf();
 }
 
-function deleteSig(i){
-  sigs.splice(i,1);
+function deleteSig(sigId){
+  const idx=sigs.findIndex(s=>s.id===sigId);
+  if(idx===-1)return;
+  sigs.splice(idx,1);
   saveSigs(sigs);refreshCounts();renderHistory();renderPerf();
 }
 
 function addSig(s){
-  sigs.unshift({...s,stakeAmt:0,odds:0,result:'NOT_SET',profit:0,note:''});
+  sigs.unshift({...s,id:_sigId(),stakeAmt:0,odds:0,result:'NOT_SET',profit:0,note:''});
   // Auto-limit 300
   if(sigs.length>MAX_SIGNALS) sigs=sigs.slice(0,MAX_SIGNALS);
   saveSigs(sigs);refreshCounts();renderHistory();renderPerf();
@@ -1423,26 +1433,30 @@ function toggleHist(){
 }
 
 // ── ROI: Save field from card input ──
-function saveField(i){
-  if(!sigs[i])return;
-  const sa=document.getElementById('sa'+i);const od=document.getElementById('od'+i);const nt=document.getElementById('nt'+i);
-  if(sa)sigs[i].stakeAmt=parseFloat(sa.value)||0;
-  if(od)sigs[i].odds=parseFloat(od.value)||0;
-  if(nt)sigs[i].note=nt.value||'';
+function saveField(sigId){
+  const s=sigs.find(x=>x.id===sigId);if(!s)return;
+  const sa=document.getElementById('sa-'+sigId);
+  const od=document.getElementById('od-'+sigId);
+  const nt=document.getElementById('nt-'+sigId);
+  if(sa)s.stakeAmt=parseFloat(sa.value)||0;
+  if(od)s.odds=parseFloat(od.value)||0;
+  if(nt)s.note=nt.value||'';
   saveSigs(sigs);renderPerf();
 }
 
 // ── ROI: Set WIN/LOSS/VOID ──
-function setResult(i,res){
-  if(!sigs[i])return;
-  const sa=document.getElementById('sa'+i);const od=document.getElementById('od'+i);const nt=document.getElementById('nt'+i);
-  const stk=parseFloat(sa?.value)||sigs[i].stakeAmt||0;
-  const odd=parseFloat(od?.value)||sigs[i].odds||0;
-  const note=nt?.value||sigs[i].note||'';
-  sigs[i].stakeAmt=stk;sigs[i].odds=odd;sigs[i].note=note;sigs[i].result=res;
-  if(res==='WIN'&&stk>0&&odd>1) sigs[i].profit=parseFloat((stk*(odd-1)).toFixed(2));
-  else if(res==='LOSS'&&stk>0)  sigs[i].profit=parseFloat((-stk).toFixed(2));
-  else                           sigs[i].profit=0;
+function setResult(sigId,res){
+  const s=sigs.find(x=>x.id===sigId);if(!s)return;
+  const sa=document.getElementById('sa-'+sigId);
+  const od=document.getElementById('od-'+sigId);
+  const nt=document.getElementById('nt-'+sigId);
+  const stk=parseFloat(sa?.value)||s.stakeAmt||0;
+  const odd=parseFloat(od?.value)||s.odds||0;
+  const note=nt?.value||s.note||'';
+  s.stakeAmt=stk;s.odds=odd;s.note=note;s.result=res;
+  if(res==='WIN'&&stk>0&&odd>1) s.profit=parseFloat((stk*(odd-1)).toFixed(2));
+  else if(res==='LOSS'&&stk>0)  s.profit=parseFloat((-stk).toFixed(2));
+  else                           s.profit=0;
   saveSigs(sigs);renderHistory();renderPerf();
 }
 
