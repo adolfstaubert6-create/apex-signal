@@ -805,86 +805,162 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
   <!-- LEFT: CONTROL -->
   <div class="col col-left">
     <div class="col-hdr">
-      <div class="cht">RIADIACI PANEL</div>
+      <div class="cht">AI RIADIACI PANEL</div>
       <div style="display:flex;gap:6px;align-items:center">
-        <div class="chb" id="lBadge">VSTUP</div>
-        <button class="zoom-btn" onclick="openZoom(this.closest('.col'),'RIADIACI PANEL')" title="Celá obrazovka">⛶</button>
+        <div class="chb" id="lBadge" style="transition:color .3s">ČAKÁM</div>
       </div>
     </div>
     <div class="col-body">
-      <!-- ── LIVE ZÁPAS SELECTOR ── -->
-      <div class="fg" style="margin-bottom:6px">
-        <label style="letter-spacing:2px">LIVE ZÁPAS</label>
-        <select id="matchSelect" onchange="selectMatch(this.value)" style="font-size:13px;font-weight:700;padding:8px 10px">
-          <option value="">— vyber zápas —</option>
-        </select>
-        <div class="lv-status" id="lvStatus" style="margin-top:4px">—</div>
-      </div>
 
-      <!-- ── LIVE MATCH CARD ── -->
-      <div id="liveMatchCard" style="background:var(--bg3);border:1px solid var(--bd);border-radius:4px;padding:11px 12px;margin-bottom:8px;transition:border-color .35s">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">
-          <div style="font-family:'IBM Plex Mono',monospace;font-size:7px;color:var(--mut);letter-spacing:2.5px;text-transform:uppercase">⚽ LIVE ZÁPAS</div>
-          <div id="livePill" style="font-family:'IBM Plex Mono',monospace;font-size:7px;color:#1a3a1a;background:rgba(0,255,136,.04);border:1px solid rgba(0,255,136,.1);padding:2px 8px;border-radius:2px;letter-spacing:1px;transition:all .3s">● LIVE</div>
+      <!-- ══ SEARCH PANEL (before match selected) ══ -->
+      <div id="matchSearchPanel">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--mut);
+             letter-spacing:3px;text-transform:uppercase;margin-bottom:10px">⚽ LIVE ZÁPAS</div>
+
+        <!-- Search input -->
+        <div style="position:relative;margin-bottom:6px">
+          <input id="liveSearchInput" type="text"
+            placeholder="Hľadať tím alebo ligu..."
+            oninput="_filterMatches(this.value)"
+            style="width:100%;background:var(--bg3);border:1px solid var(--bd);border-radius:3px;
+                   color:var(--c);font-family:'IBM Plex Mono',monospace;font-size:12px;
+                   padding:9px 12px;outline:none;box-sizing:border-box;transition:border-color .2s"
+            onfocus="this.style.borderColor='var(--c)'"
+            onblur="this.style.borderColor='var(--bd)'"/>
         </div>
-        <div id="liveMatchName" style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--mut);min-height:16px;margin-bottom:9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Žiadny zápas</div>
-        <div style="display:flex;align-items:center;gap:5px">
-          <input type="number" id="scoreH" value="0" min="0" max="20" oninput="lu()"
-            style="width:40px;font-size:18px;font-weight:700;text-align:center;padding:4px 2px;
-                   background:transparent;border:1px solid var(--bd);border-radius:2px;
-                   color:var(--c);font-family:'IBM Plex Mono',monospace;outline:none"/>
-          <div style="font-family:'Orbitron',sans-serif;font-size:16px;color:var(--mut)">:</div>
-          <input type="number" id="scoreA" value="0" min="0" max="20" oninput="lu()"
-            style="width:40px;font-size:18px;font-weight:700;text-align:center;padding:4px 2px;
-                   background:transparent;border:1px solid var(--bd);border-radius:2px;
-                   color:var(--c);font-family:'IBM Plex Mono',monospace;outline:none"/>
-          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--mut);margin:0 4px">•</div>
-          <input type="number" id="minute" value="45" min="1" max="90" oninput="lu()"
-            style="width:44px;font-size:14px;font-weight:700;text-align:center;padding:4px 2px;
-                   background:transparent;border:1px solid var(--bd);border-radius:2px;
-                   color:var(--c);font-family:'IBM Plex Mono',monospace;outline:none"/>
-          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--mut)">'</div>
+
+        <!-- Status line -->
+        <div id="lvStatus" style="font-family:'IBM Plex Mono',monospace;font-size:9px;
+             color:var(--mut);letter-spacing:.5px;margin-bottom:8px;min-height:13px">—</div>
+
+        <!-- Match list -->
+        <div id="liveMatchList"
+          style="display:flex;flex-direction:column;gap:3px;max-height:280px;overflow-y:auto;
+                 scrollbar-width:thin;scrollbar-color:rgba(0,255,247,.12) transparent">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#242424;
+               text-align:center;padding:18px 0">načítavam live zápasy...</div>
         </div>
       </div>
 
-      <!-- Team name inputs: hidden, auto-filled by live data, read by run() -->
-      <input type="text" id="home" placeholder="Domáci" style="display:none"/>
-      <input type="text" id="away" placeholder="Hosťujúci" style="display:none"/>
+      <!-- ══ ACTIVE PANEL (after match selected) ══ -->
+      <div id="matchActivePanel" style="display:none">
 
-      <!-- ── AI MONITOR STATUS ── -->
-      <div style="border:1px solid rgba(0,255,136,.1);border-radius:4px;padding:10px 12px;margin-bottom:8px">
-        <div id="aiMonitorMsg" style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:rgba(0,255,136,.45);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">AI MONITORUJE ZÁPAS</div>
-        <div id="aiStatusItems" style="display:flex;flex-direction:column;gap:3px"></div>
+        <!-- Activation status line -->
+        <div id="activationStatus"
+          style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--c);
+                 letter-spacing:2px;text-transform:uppercase;margin-bottom:14px;min-height:14px">
+          AI AKTIVOVANÉ
+        </div>
+
+        <!-- Live match card -->
+        <div style="border:1px solid rgba(0,255,247,.18);border-radius:5px;padding:13px 14px;
+                    margin-bottom:10px;background:#04090e;position:relative;overflow:hidden;
+                    transition:border-color .4s" id="liveMatchCard">
+          <div style="position:absolute;top:0;left:-100%;width:55%;height:1px;
+                      background:linear-gradient(90deg,transparent,rgba(0,255,247,.22),transparent);
+                      animation:bsnScanLine 7s linear infinite"></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:7px;color:var(--mut);
+                 letter-spacing:2.5px;text-transform:uppercase">⚽ LIVE ZÁPAS</div>
+            <div id="livePill" style="font-family:'IBM Plex Mono',monospace;font-size:7px;
+                 color:#00ff88;background:rgba(0,255,136,.06);border:1px solid rgba(0,255,136,.28);
+                 padding:2px 8px;border-radius:2px;letter-spacing:1px;animation:blk 2s infinite">
+              ● LIVE
+            </div>
+          </div>
+          <div id="liveMatchName"
+            style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--c);
+                   letter-spacing:.3px;margin-bottom:10px;overflow:hidden;
+                   text-overflow:ellipsis;white-space:nowrap">—</div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <div id="dispScoreH" style="font-family:'IBM Plex Mono',monospace;font-size:24px;
+                 font-weight:700;color:var(--c);min-width:30px;text-align:center">0</div>
+            <div style="font-family:'Orbitron',sans-serif;font-size:18px;color:var(--mut)">:</div>
+            <div id="dispScoreA" style="font-family:'IBM Plex Mono',monospace;font-size:24px;
+                 font-weight:700;color:var(--c);min-width:30px;text-align:center">0</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--mut);
+                 margin:0 5px">•</div>
+            <div id="dispMinute" style="font-family:'IBM Plex Mono',monospace;font-size:17px;
+                 font-weight:700;color:var(--c)">45</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--mut)">'</div>
+          </div>
+        </div>
+
+        <!-- AI monitor message -->
+        <div id="aiMonitorMsg"
+          style="font-family:'IBM Plex Mono',monospace;font-size:8px;
+                 color:rgba(0,255,136,.5);letter-spacing:2px;text-transform:uppercase;
+                 margin-bottom:10px;transition:color .3s">
+          AI PREBERÁ ANALÝZU ZÁPASU
+        </div>
+
+        <!-- Change match link -->
+        <div onclick="_deactivateAI()"
+          style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--mut);
+                 letter-spacing:1px;cursor:pointer;margin-bottom:10px;transition:color .15s"
+          onmouseover="this.style.color='var(--c)'"
+          onmouseout="this.style.color='var(--mut)'">
+          ← zmeniť zápas
+        </div>
       </div>
 
-      <!-- Hidden market select — driven by AI auto-select -->
+      <!-- ══ SYSTEM STATUS ══ -->
+      <div id="systemStatusPanel" style="display:none;margin-bottom:10px">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:7px;color:var(--mut);
+             letter-spacing:2px;text-transform:uppercase;margin-bottom:7px">// SYSTÉM</div>
+        <div id="sysStatusRows" style="display:flex;flex-direction:column"></div>
+      </div>
+
+      <!-- ══ RISK MODE (minimal segmented) ══ -->
+      <div style="margin-bottom:10px">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:7px;color:var(--mut);
+             letter-spacing:2px;text-transform:uppercase;margin-bottom:5px">RIZIKOVÝ REŽIM</div>
+        <div style="display:flex;background:rgba(255,255,255,.02);border:1px solid var(--bd);
+             border-radius:4px;padding:3px;gap:2px">
+          <div id="mode-safe" onclick="setMode('safe')"
+            style="flex:1;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:9px;
+                   padding:5px 3px;border-radius:3px;cursor:pointer;color:var(--mut);
+                   letter-spacing:1px;transition:all .2s">SAFE</div>
+          <div id="mode-balanced" onclick="setMode('balanced')"
+            style="flex:1;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:9px;
+                   padding:5px 3px;border-radius:3px;cursor:pointer;
+                   background:rgba(0,255,247,.08);color:var(--c);letter-spacing:1px">BAL</div>
+          <div id="mode-aggressive" onclick="setMode('aggressive')"
+            style="flex:1;text-align:center;font-family:'IBM Plex Mono',monospace;font-size:9px;
+                   padding:5px 3px;border-radius:3px;cursor:pointer;color:var(--mut);
+                   letter-spacing:1px;transition:all .2s">AGG</div>
+        </div>
+      </div>
+
+      <!-- Main action button -->
+      <button class="rbtn" id="rbtn" onclick="run()">▶ SPUSTIŤ LIVE AI</button>
+      <div class="lbar" id="lbar"></div>
+      <div class="tlog" id="tlog"></div>
+
+      <!-- ══ HIDDEN FUNCTIONAL INPUTS (engine still reads these) ══ -->
+      <input type="text" id="home" style="display:none"/>
+      <input type="text" id="away" style="display:none"/>
+      <input type="number" id="scoreH" value="0" min="0" max="20" oninput="lu()" style="display:none"/>
+      <input type="number" id="scoreA" value="0" min="0" max="20" oninput="lu()" style="display:none"/>
+      <input type="number" id="minute" value="45" min="1" max="90" oninput="lu()" style="display:none"/>
+      <select id="matchSelect" style="display:none" onchange="selectMatch(this.value)">
+        <option value="">—</option>
+      </select>
       <select id="market" style="display:none">
         <option value="goal_alert">GOAL ALERT</option>
         <option value="btts">BOTH TEAMS SCORE</option>
         <option value="next_goal">NEXT GOAL</option>
         <option value="late_goal">LATE GOAL</option>
       </select>
-      <!-- AI signal display -->
-      <div class="fg">
-        <label>AI VÝBER SIGNÁLU</label>
-        <div id="aiMarketBox" style="background:var(--bg3);border:1px solid var(--bd);border-radius:2px;padding:7px 10px;display:flex;align-items:center;justify-content:space-between;min-height:36px">
-          <span id="aiMarketLabel" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--mut);letter-spacing:.5px">— čakám na dáta —</span>
-          <span id="aiMarketScore" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--mut)"></span>
-        </div>
-      </div>
-      <div class="dvd"></div>
+      <!-- Referenced by _autoSelectMarket() -->
+      <div id="aiMarketBox" style="display:none"><span id="aiMarketLabel"></span><span id="aiMarketScore"></span></div>
+      <!-- Referenced by _updateAiStatus() -->
+      <div id="aiStatusItems" style="display:none"></div>
 
-      <div style="font-size:7px;letter-spacing:2px;color:var(--mut);margin-bottom:5px;text-transform:uppercase">ANALYTICKÝ REŽIM</div>
-      <div class="mrow">
-        <div class="mbtn" id="mode-safe" onclick="setMode('safe')">SAFE</div>
-        <div class="mbtn mb" id="mode-balanced" onclick="setMode('balanced')">BAL</div>
-        <div class="mbtn" id="mode-aggressive" onclick="setMode('aggressive')">AGG</div>
-      </div>
-      <button class="rbtn" id="rbtn" onclick="run()">⬡ SPUSTIŤ ANALÝZU ⬡</button>
-      <div class="lbar" id="lbar"></div>
-      <div class="tlog" id="tlog"></div>
     </div>
   </div>
+
+
 
   <!-- CENTER: LIVE ANALYSIS -->
   <div class="col col-center">
@@ -1174,16 +1250,6 @@ function setLvl(id,pct){
   else{el.textContent='LOW';el.className='sllvl lvl-l';}
 }
 
-// ── MODE ──
-function setMode(m){
-  mode=m;
-  ['safe','balanced','aggressive'].forEach(x=>{
-    const c=x==='safe'?'ms':x==='balanced'?'mb':'ma';
-    document.getElementById('mode-'+x).className='mbtn'+(x===m?' '+c:'');
-  });
-  lu();
-}
-
 // ── SCORE ENGINE v2 ──
 function calcScore(marketOverride){
   const minute  =parseInt(document.getElementById('minute').value)||45;
@@ -1419,57 +1485,168 @@ function _autoSelectMarket(){
   return chosen;
 }
 
-// ── LIVE CARD + AI STATUS UPDATERS ──────────────────────────
+// ── LIVE MATCH SEARCH + AI ACTIVATION ────────────────────────
+let _allLiveMatches=[];
+let _aiActivated=false;
+
+function _updateMatchList(matches){
+  _allLiveMatches=matches||[];
+  _filterMatches(document.getElementById('liveSearchInput')?.value||'');
+}
+
+function _filterMatches(q){
+  const list=document.getElementById('liveMatchList');
+  if(!list)return;
+  const ql=q.toLowerCase().trim();
+  const filtered=ql
+    ?_allLiveMatches.filter(m=>[m.home,m.away,m.league||''].some(s=>s.toLowerCase().includes(ql)))
+    :_allLiveMatches;
+
+  if(!filtered.length){
+    const msg=_allLiveMatches.length?'Žiadne zhody pre "'+q+'"':'Žiadne live zápasy';
+    list.innerHTML='<div style="font-family:\'IBM Plex Mono\',monospace;font-size:9px;color:#242424;text-align:center;padding:18px 0">'+msg+'</div>';
+    return;
+  }
+  list.innerHTML=filtered.map(m=>{
+    const id=String(m.id);
+    const league=(m.league||'').split('·')[0].trim();
+    return`<div onclick="_selectMatchFromList('${id}')"
+      style="background:var(--bg3);border:1px solid var(--bd);border-radius:3px;
+             padding:8px 10px;cursor:pointer;transition:border-color .15s,background .15s"
+      onmouseover="this.style.borderColor='rgba(0,255,247,.3)';this.style.background='#0a1218'"
+      onmouseout="this.style.borderColor='var(--bd)';this.style.background='var(--bg3)'">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--c);
+           margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+        ${escHtmlL(m.home)} vs ${escHtmlL(m.away)}
+      </div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--mut);letter-spacing:.3px">
+        ${m.scoreH}:${m.scoreA} · ${m.minute}' · ${escHtmlL(league)}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function escHtmlL(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function _selectMatchFromList(id){
+  const ms=document.getElementById('matchSelect');
+  if(ms)ms.value=id;
+  _activateAI();
+  selectMatch(id);
+}
+
+function _activateAI(){
+  if(_aiActivated)return;
+  _aiActivated=true;
+  const searchPanel=document.getElementById('matchSearchPanel');
+  const activePanel=document.getElementById('matchActivePanel');
+  const sysPanel=document.getElementById('systemStatusPanel');
+  const btn=document.getElementById('rbtn');
+  const badge=document.getElementById('lBadge');
+  if(searchPanel)searchPanel.style.display='none';
+  if(activePanel)activePanel.style.display='block';
+  if(sysPanel)sysPanel.style.display='block';
+  if(btn){btn.textContent='● AI AKTÍVNA';btn.style.borderColor='rgba(0,255,136,.4)';btn.style.color='var(--g)';}
+  if(badge){badge.textContent='AKTÍVNA';badge.style.color='var(--g)';}
+  _runActivationSequence();
+  _updateSystemStatus(true);
+}
+
+function _deactivateAI(){
+  _aiActivated=false;
+  liveFixtureId=null;
+  const searchPanel=document.getElementById('matchSearchPanel');
+  const activePanel=document.getElementById('matchActivePanel');
+  const sysPanel=document.getElementById('systemStatusPanel');
+  const btn=document.getElementById('rbtn');
+  const badge=document.getElementById('lBadge');
+  if(searchPanel)searchPanel.style.display='block';
+  if(activePanel)activePanel.style.display='none';
+  if(sysPanel)sysPanel.style.display='none';
+  if(btn){btn.textContent='▶ SPUSTIŤ LIVE AI';btn.style.borderColor='';btn.style.color='';}
+  if(badge){badge.textContent='ČAKÁM';badge.style.color='';}
+  _updateSystemStatus(false);
+}
+
+function _runActivationSequence(){
+  const el=document.getElementById('activationStatus');
+  if(!el)return;
+  const steps=['AI CONNECTING...','LIVE DATA READY...','MOMENTUM ENGINE ACTIVE...'];
+  let i=0;
+  const next=()=>{
+    el.textContent=steps[i];el.style.color='var(--c)';
+    if(i<steps.length-1){i++;setTimeout(next,650);}
+    else{setTimeout(()=>{el.textContent='AI AKTIVOVANÉ';el.style.color='#00ff88';},650);}
+  };
+  next();
+}
+
+function _updateSystemStatus(active){
+  const el=document.getElementById('sysStatusRows');
+  if(!el)return;
+  const rows=[
+    {label:'AI ENGINE',    value:'ONLINE',                      color:'#00ff88'},
+    {label:'LIVE DATA',    value:liveMode?'CONNECTED':'OFFLINE',color:liveMode?'#00ff88':'#444'},
+    {label:'MATCH TRACKING',value:active?'ACTIVE':'STANDBY',   color:active?'#00ff88':'#444'},
+    {label:'MOMENTUM ENGINE',value:active?'ACTIVE':'STANDBY',  color:active?'#00ff88':'#444'},
+  ];
+  el.innerHTML=rows.map(r=>`
+    <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #0d0d0d">
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:#2a2a2a;letter-spacing:.5px">${r.label}</span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:${r.color};letter-spacing:.5px">${r.value}</span>
+    </div>`).join('');
+}
+
+// ── UPDATED FUNCTIONS ────────────────────────────────────────
+// Replaces previous setMode, _updateLiveCard versions
+
+function setMode(m){
+  mode=m;
+  ['safe','balanced','aggressive'].forEach(x=>{
+    const el=document.getElementById('mode-'+x);
+    if(!el)return;
+    const isActive=x===m;
+    const colors={safe:{c:'var(--g)',bg:'rgba(0,255,136,.08)'},balanced:{c:'var(--c)',bg:'rgba(0,255,247,.08)'},aggressive:{c:'var(--r)',bg:'rgba(255,45,85,.08)'}};
+    el.style.background=isActive?colors[x].bg:'transparent';
+    el.style.color=isActive?colors[x].c:'var(--mut)';
+  });
+  lu();
+}
+
 function _updateLiveCard(){
   const home=document.getElementById('home')?.value||'';
   const away=document.getElementById('away')?.value||'';
+  const sH=document.getElementById('scoreH')?.value||'0';
+  const sA=document.getElementById('scoreA')?.value||'0';
+  const min=document.getElementById('minute')?.value||'45';
+
+  // Match name
   const nameEl=document.getElementById('liveMatchName');
-  const cardEl=document.getElementById('liveMatchCard');
-  const monitorEl=document.getElementById('aiMonitorMsg');
-  if(nameEl){
-    const name=home&&away?home+' vs '+away:'Žiadny zápas';
-    nameEl.textContent=name;
-    nameEl.style.color=home?'var(--c)':'var(--mut)';
-  }
+  if(nameEl){nameEl.textContent=home&&away?home+' vs '+away:'—';nameEl.style.color=home?'var(--c)':'var(--mut)';}
+
+  // Score/minute display
+  const dH=document.getElementById('dispScoreH');const dA=document.getElementById('dispScoreA');const dM=document.getElementById('dispMinute');
+  if(dH)dH.textContent=sH;if(dA)dA.textContent=sA;if(dM)dM.textContent=min;
+
   // AI monitor message
-  const best=_lastCalcData?getBestSignal(calcAllMarkets()):null;
+  const all=_lastCalcData?calcAllMarkets():null;
+  const best=all?getBestSignal(all):null;
+  const monitorEl=document.getElementById('aiMonitorMsg');
   if(monitorEl){
-    if(best&&(best.verdict==='ENTER'||best.verdict==='HIGH ALERT')){
-      monitorEl.textContent='SILNÝ SIGNÁL — VSTÚPIŤ';monitorEl.style.color='var(--g)';
-    }else if(best&&best.verdict==='WAIT'){
-      monitorEl.textContent='SIGNAL SA BUDUJE — POČKAŤ';monitorEl.style.color='var(--a)';
-    }else if(best&&best.verdict==='WATCH'){
-      monitorEl.textContent='SLEDOVAŤ — SLABÉ PODMIENKY';monitorEl.style.color='#00d4ff';
-    }else{
-      monitorEl.textContent='AI MONITORUJE ZÁPAS';monitorEl.style.color='rgba(0,255,136,.45)';
-    }
+    if(best&&(best.verdict==='ENTER'||best.verdict==='HIGH ALERT')){monitorEl.textContent='SILNÝ SIGNÁL — VSTÚPIŤ';monitorEl.style.color='var(--g)';}
+    else if(best&&best.verdict==='WAIT'){monitorEl.textContent='SIGNAL SA BUDUJE — POČKAŤ';monitorEl.style.color='var(--a)';}
+    else if(best&&best.verdict==='WATCH'){monitorEl.textContent='SLEDOVAŤ — SLABÉ PODMIENKY';monitorEl.style.color='#00d4ff';}
+    else{monitorEl.textContent='AI MONITORUJE ZÁPAS';monitorEl.style.color='rgba(0,255,136,.45)';}
   }
-  if(cardEl&&home){
-    const bc=best?(VERDICT_COLOR[best.verdict]||'var(--bd)')+'44':'var(--bd)';
-    cardEl.style.borderColor=bc;
-  }
+
+  // Card border tracks best verdict
+  const cardEl=document.getElementById('liveMatchCard');
+  if(cardEl&&home){cardEl.style.borderColor=best?(VERDICT_COLOR[best.verdict]||'var(--bd)')+'44':'rgba(0,255,247,.18)';}
+
+  // Activate if match loaded but panel not yet activated
+  if(home&&away&&!_aiActivated)_activateAI();
 }
 
-function _updateAiStatus(){
-  const el=document.getElementById('aiStatusItems');if(!el)return;
-  const d=_lastCalcData||{};
-  const vel=_getVelocity();
-  const items=[
-    {label:'tempo zápasu',  active:(d.attacks||0)>25||(d.shots||0)>3},
-    {label:'momentum',      active:vel&&vel.score>3},
-    {label:'tlak tímov',    active:(d.pressure||0)>=5},
-    {label:'rast xG',       active:(d.xg||0)>=1.0||(vel&&vel.xg>0.1)},
-    {label:'rast útokov',   active:vel&&vel.attacks>4},
-  ];
-  el.innerHTML=items.map(item=>`
-    <div style="display:flex;align-items:center;gap:7px">
-      <span style="width:5px;height:5px;border-radius:50%;flex-shrink:0;
-        background:${item.active?'var(--g)':'#1e1e1e'};
-        ${item.active?'box-shadow:0 0 5px var(--g)':''}"></span>
-      <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.3px;
-        color:${item.active?'var(--text2)':'#2a2a2a'}">${item.label}</span>
-    </div>`).join('');
-}
 
 function lu(){
   _autoSelectMarket();
@@ -2404,15 +2581,15 @@ async function fetchLiveMatches(){
 
     const ms=data.matches||[];
     const prev=sel.value;
+    // Keep hidden select in sync (used internally)
+    sel.innerHTML='<option value="">—</option>'+ms.map(m=>`<option value="${m.id}">${m.home} vs ${m.away}</option>`).join('');
+    if(prev&&ms.find(m=>String(m.id)===prev))sel.value=prev;
+    // Update custom visual match list
+    _updateMatchList(ms);
     if(ms.length===0){
-      sel.innerHTML='<option class="live-scanning" value="">⟳ Skenujem live zápasy...</option>';
       const t=new Date().toTimeString().slice(0,5);
       st.textContent=`Žiadne live zápasy · ${t} · retry za 30s`;
-    } else {
-      sel.innerHTML='<option value="">— vyber zápas —</option>'+ms.map(m=>
-        `<option value="${m.id}">${m.home} vs ${m.away} · ${m.scoreH}:${m.scoreA} · ${m.minute}' [${m.league}]</option>`
-      ).join('');
-      if(prev&&ms.find(m=>String(m.id)===prev))sel.value=prev;
+    }else{
       const t=new Date().toTimeString().slice(0,5);
       st.textContent=`${ms.length} live zápasov · ${t}`;
     }
