@@ -2,6 +2,18 @@
   publish = "."
   functions = "netlify/functions"
 
+[functions]
+  node_bundler = "esbuild"
+
+[functions."get-live-matches"]
+  timeout = 15
+
+[functions."get-match-stats"]
+  timeout = 15
+
+[functions."ai-chat"]
+  timeout = 30
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
