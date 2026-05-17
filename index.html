@@ -1326,7 +1326,7 @@ function runLog(cb){
 
 // ── HISTORY ──
 function loadSigs(){try{return JSON.parse(localStorage.getItem(LS)||'[]');}catch{return[];}}
-function saveSigs(a){try{localStorage.setItem(LS,JSON.stringify(a.slice(0,60)));}catch{}}
+function saveSigs(a){try{localStorage.setItem(LS,JSON.stringify(a.slice(0,300)));}catch{}}
 let sigs=loadSigs();
 const MAX_SIGNALS=300;
 
@@ -1817,7 +1817,6 @@ function setLiveMode(on){
   }
 }
 
-let _liveEmptyTimer=null;
 async function fetchLiveMatches(){
   const sel=document.getElementById('matchSelect');
   const st=document.getElementById('lvStatus');
@@ -1846,10 +1845,7 @@ async function fetchLiveMatches(){
       sel.innerHTML='<option class="live-scanning" value="">⟳ Skenujem live zápasy...</option>';
       const t=new Date().toTimeString().slice(0,5);
       st.textContent=`Žiadne live zápasy · ${t} · retry za 30s`;
-      if(_liveEmptyTimer)clearTimeout(_liveEmptyTimer);
-      _liveEmptyTimer=setTimeout(fetchLiveMatches,30000);
     } else {
-      if(_liveEmptyTimer){clearTimeout(_liveEmptyTimer);_liveEmptyTimer=null;}
       sel.innerHTML='<option value="">— vyber zápas —</option>'+ms.map(m=>
         `<option value="${m.id}">${m.home} vs ${m.away} · ${m.scoreH}:${m.scoreA} · ${m.minute}' [${m.league}]</option>`
       ).join('');
@@ -1861,8 +1857,6 @@ async function fetchLiveMatches(){
     const msg=e.message||'Neznáma chyba';
     st.textContent='Chyba: '+msg.slice(0,60);
     sel.innerHTML=`<option value="">✕ ${msg.slice(0,40)}</option>`;
-    if(_liveEmptyTimer)clearTimeout(_liveEmptyTimer);
-    _liveEmptyTimer=setTimeout(fetchLiveMatches,30000);
   }
 }
 
