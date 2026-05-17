@@ -838,13 +838,20 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
         </div>
       </div>
       <div class="fg"><label>Minúta</label><input type="number" id="minute" value="45" min="1" max="90" oninput="lu()"/></div>
-      <div class="fg"><label>Market</label>
-        <select id="market" onchange="lu()">
-          <option value="goal_alert">GOAL ALERT</option>
-          <option value="btts">BOTH TEAMS SCORE</option>
-          <option value="next_goal">NEXT GOAL</option>
-          <option value="late_goal">LATE GOAL</option>
-        </select>
+      <!-- Hidden market select — controlled by AI auto-select, not user -->
+      <select id="market" style="display:none">
+        <option value="goal_alert">GOAL ALERT</option>
+        <option value="btts">BOTH TEAMS SCORE</option>
+        <option value="next_goal">NEXT GOAL</option>
+        <option value="late_goal">LATE GOAL</option>
+      </select>
+      <!-- AI auto-selected market display -->
+      <div class="fg">
+        <label>AI VÝBER</label>
+        <div id="aiMarketBox" style="background:var(--bg3);border:1px solid var(--bd);border-radius:2px;padding:7px 10px;display:flex;align-items:center;justify-content:space-between;min-height:36px">
+          <span id="aiMarketLabel" style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--mut);letter-spacing:.5px">— čakám na dáta —</span>
+          <span id="aiMarketScore" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--mut)"></span>
+        </div>
       </div>
       <div class="dvd"></div>
       <div style="font-size:7px;letter-spacing:2px;color:var(--mut);margin-bottom:5px;text-transform:uppercase">ANALYTICKÝ REŽIM</div>
@@ -1366,7 +1373,34 @@ let sIdx=0;
 function rotateScan(){document.getElementById('smsg').textContent=SCAN_MSGS[sIdx=(sIdx+1)%SCAN_MSGS.length];}
 setInterval(rotateScan,2600);
 
+function _autoSelectMarket(){
+  const all=calcAllMarkets();
+  const best=getBestSignal(all);
+
+  // Pick best signal market; fall back to highest-score non-invalid; then goal_alert
+  let chosen = best ? best.market
+    : (all.filter(d=>!d.invalidated).sort((a,b)=>b.score-a.score)[0]||{}).market || 'goal_alert';
+
+  document.getElementById('market').value=chosen;
+
+  // Update AI display box
+  const mkt=all.find(d=>d.market===chosen);
+  const label=document.getElementById('aiMarketLabel');
+  const scoreEl=document.getElementById('aiMarketScore');
+  const box=document.getElementById('aiMarketBox');
+  if(label&&mkt){
+    const v=mkt.verdict;
+    const col=VERDICT_COLOR[v]||'#555';
+    label.textContent=(MKT_ICON[chosen]||'')+'  '+(MKT[chosen]||chosen);
+    label.style.color=mkt.invalidated?'#444':col;
+    if(scoreEl){scoreEl.textContent=mkt.invalidated?'—':mkt.score+'/100';scoreEl.style.color=mkt.invalidated?'#333':col;}
+    if(box){box.style.borderColor=mkt.invalidated?'var(--bd)':(best?col+'55':'var(--bd)');}
+  }
+  return chosen;
+}
+
 function lu(){
+  _autoSelectMarket();
   const d=calcScore();
   const v=getVerdict(d.score,d.invalidated);
   const col=VERDICT_COLOR[v]||'var(--r)';
