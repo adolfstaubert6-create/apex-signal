@@ -726,6 +726,14 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
   <div class="tb-sep"></div>
   <div class="tb-clk" id="tbClk">--:--:--</div>
   <div class="tb-sig">SIG:<b id="tbSig">0</b></div>
+  <button id="hotRadarBtn" onclick="toggleHotRadar()"
+    style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:1.5px;
+           color:rgba(0,255,247,.6);background:transparent;border:1px solid rgba(0,255,247,.2);
+           padding:3px 10px;border-radius:2px;cursor:pointer;transition:all .2s;white-space:nowrap"
+    onmouseover="this.style.background='rgba(0,255,247,.1)';this.style.color='#00fff7'"
+    onmouseout="if(!_hotRadarOpen){this.style.background='transparent';this.style.color='rgba(0,255,247,.6)'}">
+    🔥 RADAR
+  </button>
   <button class="tb-ticket" onclick="openTicket()">⚡ AI TIKET</button>
 </header>
 
@@ -1496,7 +1504,8 @@ function _updateMatchList(matches){
     if(real.length)  st.textContent=real.length+' live zápasov práve teraz';
     else             st.textContent='DEMO — žiadne live zápasy';
   }
-  // Refresh overlay if open
+  // Refresh radar and overlay if open
+  _hotMatchesRefresh();
   const overlay=document.getElementById('matchOverlay');
   if(overlay&&overlay.style.display!=='none'){
     _renderOverlayCards(document.getElementById('overlaySearch')?.value||'');
@@ -1639,6 +1648,9 @@ function _selectMatchFromOverlay(id){
   if(statusEl){statusEl.textContent='NAČÍTAVAM ŽIVÉ DÁTA...';statusEl.style.color='var(--c)';}
   const badge=document.getElementById('lBadge');
   if(badge){badge.textContent='NAČÍTAVAM';badge.style.color='var(--c)';}
+
+  // Update radar active state during loading
+  if(_hotRadarOpen) _renderHotMatches();
 
   // ── STEP 2: After 1s — fill real data, run AI ──
   setTimeout(()=>{
@@ -3252,6 +3264,126 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
+// ── HOT MATCHES RADAR ────────────────────────────────────────
+let _hotRadarOpen=false;
+
+function toggleHotRadar(){
+  _hotRadarOpen=!_hotRadarOpen;
+  const panel=document.getElementById('hotRadar');
+  const btn=document.getElementById('hotRadarBtn');
+  if(panel) panel.classList.toggle('open',_hotRadarOpen);
+  if(btn){
+    btn.style.background=_hotRadarOpen?'rgba(0,255,247,.1)':'transparent';
+    btn.style.color=_hotRadarOpen?'#00fff7':'rgba(0,255,247,.6)';
+    btn.style.borderColor=_hotRadarOpen?'rgba(0,255,247,.4)':'rgba(0,255,247,.2)';
+  }
+  if(_hotRadarOpen) _renderHotMatches();
+}
+
+// Edge quality rank — used for sorting
+function _rankMatchEdge(m){
+  const diff=Math.abs(m.scoreH-m.scoreA);
+  const total=m.scoreH+m.scoreA;
+  const min=m.minute||0;
+  let s=0;
+  // Tension: game closeness
+  if(diff===0)       s+=40;
+  else if(diff===1)  s+=28;
+  else if(diff===2)  s+=10;
+  // Minute zone urgency
+  if(min>=65&&min<=82)        s+=40;
+  else if(min>=50&&min<65)    s+=28;
+  else if(min>=82&&min<=88)   s+=22;
+  else if(min>=35&&min<50)    s+=14;
+  // Goal activity sweet spot
+  if(total>=1&&total<=2)      s+=20;
+  else if(total===0)          s+=12;
+  else if(total===3)          s+=8;
+  return s;
+}
+
+// Status label based on match state
+function _matchEdgeStatus(m){
+  const diff=Math.abs(m.scoreH-m.scoreA);
+  const total=m.scoreH+m.scoreA;
+  const min=m.minute||0;
+  if(diff===0&&min>=65&&min<=82) return{label:'⚡ EDGE SPIKE',     col:'#ffb300',glow:true};
+  if(diff===0&&min>=50)          return{label:'🔥 GÓLOVÁ ZÓNA',   col:'#ff6b2b',glow:false};
+  if(diff===1&&min>=65)          return{label:'◈ MOMENTUM RASTIE',col:'#00d4ff',glow:false};
+  if(diff===1&&min>=45)          return{label:'◈ SLEDOVAŤ',       col:'#00d4ff',glow:false};
+  if(diff>=2&&min>72)            return{label:'— ROZHODNUTÉ',     col:'#252525',glow:false};
+  if(min<30)                     return{label:'● ÚVOD ZÁPASU',    col:'#2a5a5a',glow:false};
+  return                               {label:'● MONITORUJEM',    col:'#2a5a5a',glow:false};
+}
+
+function _renderHotMatches(){
+  const list=document.getElementById('hotMatchList');
+  const countEl=document.getElementById('hotMatchCount');
+  const statusEl=document.getElementById('hotRadarStatus');
+  if(!list)return;
+
+  const real=_allLiveMatches.filter(m=>!m._demo);
+  const toShow=real.length?real:_allLiveMatches;
+
+  if(countEl) countEl.textContent=real.length?real.length+' LIVE':'DEMO';
+  if(statusEl) statusEl.textContent=real.length
+    ?'SCANNEM '+real.length+' LIVE ZÁPASOV · '+new Date().toTimeString().slice(0,8)
+    :'DEMO REŽIM — nastavte API_FOOTBALL_KEY';
+
+  if(!toShow.length){
+    list.innerHTML='<div style="font-family:\'IBM Plex Mono\',monospace;font-size:9px;color:#1a3a3a;text-align:center;padding:30px 0">Žiadne live zápasy</div>';
+    return;
+  }
+
+  // Sort by edge quality descending
+  const sorted=[...toShow].sort((a,b)=>_rankMatchEdge(b)-_rankMatchEdge(a));
+
+  list.innerHTML=sorted.map(m=>{
+    const st=_matchEdgeStatus(m);
+    const isActive=liveFixtureId&&String(m.id)===String(liveFixtureId);
+    const rank=_rankMatchEdge(m);
+    const league=(m.league||'').split('·')[0].trim().slice(0,22);
+    return`<div class="hr-row${isActive?' active':''}${st.glow?' glow':''}"
+               onclick="_selectHotMatch('${String(m.id)}')">
+      <div class="hr-scan"></div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+        <div style="flex:1;min-width:0">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:600;
+               color:${isActive?'#00fff7':'#c0d0d0'};overflow:hidden;text-overflow:ellipsis;
+               white-space:nowrap;margin-bottom:3px">${escHtmlL(m.home)} vs ${escHtmlL(m.away)}</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:${st.col};
+               letter-spacing:.4px;margin-bottom:3px">${st.label}</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:#2a4a4a">${escHtmlL(league)}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:700;
+               color:${isActive?'#00fff7':'#8a9a9a'};line-height:1;letter-spacing:1px">
+            ${m.scoreH}:${m.scoreA}
+          </div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#3a5a5a;margin-top:3px">
+            ${m.minute}'
+          </div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:7px;color:#1e3a3a;
+               letter-spacing:.5px;margin-top:2px">E:${rank}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Called when match list updates — refresh radar if open
+function _hotMatchesRefresh(){
+  if(_hotRadarOpen) _renderHotMatches();
+}
+
+// Click on radar row — instant match switch with loading
+async function _selectHotMatch(id){
+  if(String(id)===String(liveFixtureId))return; // already selected
+  _selectMatchFromOverlay(id);
+  // Re-render immediately to show active state
+  setTimeout(()=>{ if(_hotRadarOpen) _renderHotMatches(); },100);
+}
+
 // ── BSN MODAL ──
 function openBSNModal(){
   const modal=document.getElementById('bsnModal');
@@ -3327,6 +3459,80 @@ requestAnimationFrame(()=>{initGraph();});
       style="flex:1;overflow:hidden;padding:16px 22px">
     </div>
 
+  </div>
+</div>
+
+<!-- ── HOT MATCHES RADAR ── -->
+<style>
+  #hotRadar{
+    position:fixed;top:var(--tb);right:0;width:340px;
+    height:calc(100vh - var(--tb));z-index:500;
+    transform:translateX(100%);
+    transition:transform .3s cubic-bezier(.4,0,.2,1);
+    display:flex;flex-direction:column;
+    background:rgba(1,6,12,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border-left:1px solid rgba(0,255,247,.14);
+    box-shadow:-12px 0 40px rgba(0,0,0,.6),-4px 0 16px rgba(0,255,247,.04);
+  }
+  #hotRadar.open{transform:translateX(0);}
+  @media(max-width:760px){#hotRadar{width:100vw;}}
+  .hr-row{
+    padding:10px 12px;margin:0 8px 5px;border-radius:5px;
+    background:rgba(0,10,18,.6);border:1px solid rgba(0,255,247,.07);
+    cursor:pointer;transition:background .15s,border-color .15s;
+    position:relative;overflow:hidden;
+  }
+  .hr-row:hover{background:rgba(0,255,247,.06);border-color:rgba(0,255,247,.2);}
+  .hr-row.active{background:rgba(0,255,247,.08);border-color:rgba(0,255,247,.3);}
+  .hr-row.glow{box-shadow:0 0 14px rgba(255,179,0,.14),inset 0 0 10px rgba(255,179,0,.04);}
+  .hr-scan{position:absolute;top:0;left:-100%;width:50%;height:1px;
+    background:linear-gradient(90deg,transparent,rgba(0,255,247,.25),transparent);
+    animation:bsnScanLine 6s linear infinite;}
+</style>
+
+<div id="hotRadar">
+  <!-- Header -->
+  <div style="display:flex;align-items:center;justify-content:space-between;
+              padding:12px 14px;border-bottom:1px solid rgba(0,255,247,.1);
+              flex-shrink:0;background:rgba(0,5,10,.8);position:relative">
+    <div style="position:absolute;bottom:0;left:0;right:0;height:1px;
+                background:linear-gradient(90deg,transparent,rgba(0,255,247,.2),transparent)"></div>
+    <div>
+      <div style="font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;
+                  color:#00fff7;letter-spacing:3px;text-transform:uppercase;display:flex;align-items:center;gap:7px">
+        <span style="width:7px;height:7px;border-radius:50%;background:#00ff88;
+                     box-shadow:0 0 8px #00ff88;animation:blk 1.5s infinite;flex-shrink:0"></span>
+        🔥 HOT MATCHES
+      </div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:#2a5a5a;
+                  letter-spacing:2px;margin-top:3px">AI MARKET SCANNER</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div id="hotMatchCount" style="font-family:'IBM Plex Mono',monospace;font-size:9px;
+           color:#2a5a5a;letter-spacing:1px"></div>
+      <button onclick="toggleHotRadar()"
+        style="background:none;border:1px solid rgba(255,45,85,.2);color:rgba(255,45,85,.5);
+               font-family:'IBM Plex Mono',monospace;font-size:10px;width:28px;height:28px;
+               border-radius:2px;cursor:pointer;transition:all .15s"
+        onmouseover="this.style.background='rgba(255,45,85,.08)';this.style.color='#ff2d55'"
+        onmouseout="this.style.background='none';this.style.color='rgba(255,45,85,.5)'">✕</button>
+    </div>
+  </div>
+  <!-- Sort label -->
+  <div style="padding:6px 14px;border-bottom:1px solid rgba(0,255,247,.06);flex-shrink:0">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:7px;color:#1e3a3a;
+                letter-spacing:2px;text-transform:uppercase">ZORADENÉ: EDGE ACCELERATION</div>
+  </div>
+  <!-- Match list -->
+  <div id="hotMatchList" style="flex:1;overflow-y:auto;padding:8px 0;
+       scrollbar-width:thin;scrollbar-color:rgba(0,255,247,.1) transparent">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#1a3a3a;
+                text-align:center;padding:30px 0">inicializujem radar...</div>
+  </div>
+  <!-- Footer -->
+  <div style="padding:8px 14px;border-top:1px solid rgba(0,255,247,.06);flex-shrink:0">
+    <div id="hotRadarStatus" style="font-family:'IBM Plex Mono',monospace;font-size:8px;
+         color:#1e3a3a;letter-spacing:1px">SCANNEM LIVE MARKET...</div>
   </div>
 </div>
 
