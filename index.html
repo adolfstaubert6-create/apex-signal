@@ -814,32 +814,26 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
 
       <!-- ══ SEARCH PANEL (before match selected) ══ -->
       <div id="matchSearchPanel">
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--mut);
-             letter-spacing:3px;text-transform:uppercase;margin-bottom:10px">⚽ LIVE ZÁPAS</div>
-
-        <!-- Search input -->
-        <div style="position:relative;margin-bottom:6px">
-          <input id="liveSearchInput" type="text"
-            placeholder="Hľadať tím alebo ligu..."
-            oninput="_filterMatches(this.value)"
-            style="width:100%;background:var(--bg3);border:1px solid var(--bd);border-radius:3px;
-                   color:var(--c);font-family:'IBM Plex Mono',monospace;font-size:12px;
-                   padding:9px 12px;outline:none;box-sizing:border-box;transition:border-color .2s"
-            onfocus="this.style.borderColor='var(--c)'"
-            onblur="this.style.borderColor='var(--bd)'"/>
-        </div>
-
-        <!-- Status line -->
-        <div id="lvStatus" style="font-family:'IBM Plex Mono',monospace;font-size:9px;
-             color:var(--mut);letter-spacing:.5px;margin-bottom:8px;min-height:13px">—</div>
-
-        <!-- Match list -->
-        <div id="liveMatchList"
-          style="display:flex;flex-direction:column;gap:3px;max-height:280px;overflow-y:auto;
-                 scrollbar-width:thin;scrollbar-color:rgba(0,255,247,.12) transparent">
-          <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#242424;
-               text-align:center;padding:18px 0">načítavam live zápasy...</div>
-        </div>
+        <!-- Single entry point — opens match overlay -->
+        <button onclick="openMatchOverlay()"
+          style="width:100%;background:rgba(0,255,247,.04);border:1px solid rgba(0,255,247,.2);
+                 border-radius:5px;padding:22px 16px;cursor:pointer;transition:all .25s;
+                 display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+                 position:relative;overflow:hidden"
+          onmouseover="this.style.background='rgba(0,255,247,.08)';this.style.borderColor='rgba(0,255,247,.4)'"
+          onmouseout="this.style.background='rgba(0,255,247,.04)';this.style.borderColor='rgba(0,255,247,.2)'">
+          <span style="font-size:22px">⚽</span>
+          <span style="font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;
+                       color:var(--c);letter-spacing:3px;text-transform:uppercase">VYBRAŤ LIVE ZÁPAS</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--mut);
+                       letter-spacing:1.5px" id="lvStatus">načítavam zápasy...</span>
+        </button>
+        <!-- Hidden functional elements -->
+        <select id="matchSelect" style="display:none" onchange="selectMatch(this.value)">
+          <option value="">—</option>
+        </select>
+        <div id="liveMatchList" style="display:none"></div>
+        <input id="liveSearchInput" style="display:none" type="text"/>
       </div>
 
       <!-- ══ ACTIVE PANEL (after match selected) ══ -->
@@ -1485,55 +1479,112 @@ function _autoSelectMarket(){
   return chosen;
 }
 
-// ── LIVE MATCH SEARCH + AI ACTIVATION ────────────────────────
+// ── LIVE MATCH OVERLAY + AI ACTIVATION ───────────────────────
 let _allLiveMatches=[];
 let _aiActivated=false;
 
+function escHtmlL(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
 function _updateMatchList(matches){
   _allLiveMatches=matches||[];
-  _filterMatches(document.getElementById('liveSearchInput')?.value||'');
+  // Update button status text
+  const st=document.getElementById('lvStatus');
+  if(st){
+    if(!matches||!matches.length) st.textContent='žiadne live zápasy';
+    else st.textContent=matches.length+' live zápasov práve teraz';
+  }
+  // Refresh overlay if open
+  const overlay=document.getElementById('matchOverlay');
+  if(overlay&&overlay.style.display!=='none') _renderOverlayCards(document.getElementById('overlaySearch')?.value||'');
 }
 
-function _filterMatches(q){
-  const list=document.getElementById('liveMatchList');
+function openMatchOverlay(){
+  const overlay=document.getElementById('matchOverlay');
+  if(!overlay)return;
+  overlay.style.display='flex';
+  document.body.style.overflow='hidden';
+  const searchEl=document.getElementById('overlaySearch');
+  if(searchEl){searchEl.value='';setTimeout(()=>searchEl.focus(),120);}
+  _renderOverlayCards('');
+  // Update overlay status
+  const os=document.getElementById('overlayStatus');
+  if(os) os.textContent=_allLiveMatches.length?_allLiveMatches.length+' live zápasov':'načítavam...';
+}
+
+function closeMatchOverlay(){
+  const overlay=document.getElementById('matchOverlay');
+  if(overlay) overlay.style.display='none';
+  document.body.style.overflow='';
+}
+
+function _filterOverlay(q){
+  _renderOverlayCards(q);
+}
+
+function _renderOverlayCards(q){
+  const list=document.getElementById('overlayMatchList');
   if(!list)return;
-  const ql=q.toLowerCase().trim();
+  const ql=(q||'').toLowerCase().trim();
   const filtered=ql
     ?_allLiveMatches.filter(m=>[m.home,m.away,m.league||''].some(s=>s.toLowerCase().includes(ql)))
     :_allLiveMatches;
 
   if(!filtered.length){
-    const msg=_allLiveMatches.length?'Žiadne zhody pre "'+q+'"':'Žiadne live zápasy';
-    list.innerHTML='<div style="font-family:\'IBM Plex Mono\',monospace;font-size:9px;color:#242424;text-align:center;padding:18px 0">'+msg+'</div>';
+    const msg=_allLiveMatches.length?'Žiadne zhody pre "'+q+'"':'Žiadne live zápasy momentálne';
+    list.innerHTML=`<div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#2a2a2a;text-align:center;padding:40px 0">${msg}</div>`;
     return;
   }
+
   list.innerHTML=filtered.map(m=>{
     const id=String(m.id);
-    const league=(m.league||'').split('·')[0].trim();
-    return`<div onclick="_selectMatchFromList('${id}')"
-      style="background:var(--bg3);border:1px solid var(--bd);border-radius:3px;
-             padding:8px 10px;cursor:pointer;transition:border-color .15s,background .15s"
-      onmouseover="this.style.borderColor='rgba(0,255,247,.3)';this.style.background='#0a1218'"
-      onmouseout="this.style.borderColor='var(--bd)';this.style.background='var(--bg3)'">
-      <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--c);
-           margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
-        ${escHtmlL(m.home)} vs ${escHtmlL(m.away)}
-      </div>
-      <div style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--mut);letter-spacing:.3px">
-        ${m.scoreH}:${m.scoreA} · ${m.minute}' · ${escHtmlL(league)}
+    const league=(m.league||'').split('·')[0].trim().slice(0,30);
+    return`<div style="background:#08111a;border:1px solid rgba(0,255,247,.1);border-radius:6px;
+                padding:14px 16px;transition:border-color .2s,background .2s"
+              onmouseover="this.style.borderColor='rgba(0,255,247,.3)';this.style.background='#0a161f'"
+              onmouseout="this.style.borderColor='rgba(0,255,247,.1)';this.style.background='#08111a'">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+        <div style="flex:1;min-width:0">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#00fff7;
+               font-weight:600;margin-bottom:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            ${escHtmlL(m.home)} vs ${escHtmlL(m.away)}
+          </div>
+          <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:6px">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:700;color:#00fff7">
+              ${m.scoreH}:${m.scoreA}
+            </span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:rgba(0,255,247,.5)">
+              ${m.minute}'
+            </span>
+          </div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:#2a5a5a;letter-spacing:.5px">
+            ${escHtmlL(league)}
+          </div>
+        </div>
+        <button onclick="_selectMatchFromOverlay('${id}')"
+          style="background:rgba(0,255,247,.08);border:1px solid rgba(0,255,247,.28);
+                 color:#00fff7;font-family:'IBM Plex Mono',monospace;font-size:9px;
+                 letter-spacing:2px;padding:8px 14px;border-radius:3px;cursor:pointer;
+                 white-space:nowrap;flex-shrink:0;transition:all .2s"
+          onmouseover="this.style.background='rgba(0,255,247,.18)';this.style.borderColor='#00fff7'"
+          onmouseout="this.style.background='rgba(0,255,247,.08)';this.style.borderColor='rgba(0,255,247,.28)'">
+          VYBRAŤ
+        </button>
       </div>
     </div>`;
   }).join('');
 }
 
-function escHtmlL(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-
-function _selectMatchFromList(id){
+function _selectMatchFromOverlay(id){
+  closeMatchOverlay();
   const ms=document.getElementById('matchSelect');
   if(ms)ms.value=id;
   _activateAI();
   selectMatch(id);
 }
+
+// Legacy alias (still referenced by old fetchLiveMatches path)
+function _selectMatchFromList(id){_selectMatchFromOverlay(id);}
+function _filterMatches(q){_renderOverlayCards(q);}
 
 function _activateAI(){
   if(_aiActivated)return;
@@ -3048,7 +3099,9 @@ function closeBSNModal(){
   if(modal) modal.style.display='none';
   document.body.style.overflow='';
 }
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closeBSNModal();});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){closeBSNModal();closeMatchOverlay();}
+});
 
 // ── INIT ──
 initSliders();lu();refreshCounts();renderHistory();renderPerf();startSB();startTbRotation();startAmbientLog();startStandbyRot();
@@ -3104,6 +3157,61 @@ requestAnimationFrame(()=>{initGraph();});
              scrollbar-width:thin;scrollbar-color:rgba(0,255,247,.18) transparent">
     </div>
 
+  </div>
+</div>
+
+<!-- ── LIVE MATCH OVERLAY ── -->
+<div id="matchOverlay" onclick="if(event.target===this)closeMatchOverlay()"
+  style="display:none;position:fixed;inset:0;z-index:9960;
+         background:rgba(1,4,6,.82);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+         flex-direction:column;align-items:center;justify-content:center;padding:20px">
+
+  <div style="background:#050d12;border:1px solid rgba(0,255,247,.18);border-radius:8px;
+              width:min(92vw,680px);max-height:88vh;display:flex;flex-direction:column;
+              box-shadow:0 0 60px rgba(0,255,247,.06),0 24px 60px rgba(0,0,0,.7);overflow:hidden">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;
+                padding:14px 20px;border-bottom:1px solid rgba(0,255,247,.1);
+                flex-shrink:0;background:#040a0e;position:relative">
+      <div style="position:absolute;bottom:0;left:0;right:0;height:1px;
+                  background:linear-gradient(90deg,transparent,rgba(0,255,247,.25),transparent)"></div>
+      <div>
+        <div style="font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;
+                    color:#00fff7;letter-spacing:4px;text-transform:uppercase">
+          ⚽ LIVE ZÁPASY
+        </div>
+        <div id="overlayStatus" style="font-family:'IBM Plex Mono',monospace;font-size:9px;
+                    color:#2a4a4a;letter-spacing:1px;margin-top:3px">načítavam...</div>
+      </div>
+      <button onclick="closeMatchOverlay()"
+        style="background:none;border:1px solid rgba(255,45,85,.25);color:rgba(255,45,85,.6);
+               font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:1px;
+               padding:5px 14px;border-radius:3px;cursor:pointer;transition:all .2s"
+        onmouseover="this.style.background='rgba(255,45,85,.1)';this.style.color='#ff2d55'"
+        onmouseout="this.style.background='none';this.style.color='rgba(255,45,85,.6)'">
+        ✕
+      </button>
+    </div>
+
+    <!-- Search filter -->
+    <div style="padding:12px 18px;border-bottom:1px solid rgba(0,255,247,.06);flex-shrink:0">
+      <input id="overlaySearch" type="text" placeholder="Filtrovať tím alebo ligu..."
+        oninput="_filterOverlay(this.value)"
+        style="width:100%;background:rgba(0,255,247,.04);border:1px solid rgba(0,255,247,.1);
+               border-radius:3px;color:#00fff7;font-family:'IBM Plex Mono',monospace;font-size:11px;
+               padding:8px 12px;outline:none;box-sizing:border-box;transition:border-color .2s"
+        onfocus="this.style.borderColor='rgba(0,255,247,.35)'"
+        onblur="this.style.borderColor='rgba(0,255,247,.1)'"/>
+    </div>
+
+    <!-- Match cards scroll -->
+    <div id="overlayMatchList" style="flex:1;overflow-y:auto;padding:12px 16px;
+         display:flex;flex-direction:column;gap:8px;
+         scrollbar-width:thin;scrollbar-color:rgba(0,255,247,.12) transparent">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#242424;
+           text-align:center;padding:32px 0">načítavam live zápasy...</div>
+    </div>
   </div>
 </div>
 
