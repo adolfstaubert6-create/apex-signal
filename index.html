@@ -966,6 +966,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
         </div>
       </div>
 
+      <!-- ALL MARKETS PANEL -->
+      <div id="allMarketsPanel" style="display:none;margin-bottom:8px"></div>
+
       <!-- Signal Score -->
       <div class="snum-b">
         <div class="snum" id="snum">--</div>
@@ -1375,8 +1378,9 @@ function lu(){
   _renderBestSignal();
 }
 
-// ── BEST SIGNAL NOW ──────────────────────────────────────────
+// ── ALL MARKETS ENGINE ───────────────────────────────────────
 const BSN_MARKETS=['goal_alert','btts','next_goal','late_goal'];
+const MKT_ICON={goal_alert:'🔥',btts:'⚔',next_goal:'🎯',late_goal:'⏱'};
 
 function calcAllMarkets(){
   return BSN_MARKETS.map(m=>{
@@ -1385,10 +1389,10 @@ function calcAllMarkets(){
   });
 }
 
-function getBestSignal(){
+function getBestSignal(all){
   const vel=_getVelocity();
   const velBonus=vel&&vel.score>8?8:vel&&vel.score>4?4:0;
-  const valid=calcAllMarkets()
+  const valid=(all||calcAllMarkets())
     .filter(d=>!d.invalidated&&d.score>=36)
     .map(d=>({...d,rank:d.score+velBonus}))
     .sort((a,b)=>b.rank-a.rank);
@@ -1396,69 +1400,70 @@ function getBestSignal(){
 }
 
 function _renderBestSignal(){
-  // Get or create panel — injected into center column body below conditions
-  let panel=document.getElementById('bsnPanel');
-  if(!panel){
-    const cb=document.querySelector('.col-center .col-body');
-    if(!cb)return;
-    panel=document.createElement('div');
-    panel.id='bsnPanel';
-    panel.style.cssText='background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin-top:10px;transition:border-color .35s,box-shadow .35s;';
-    cb.appendChild(panel);
-  }
+  const panel=document.getElementById('allMarketsPanel');
+  if(!panel) return;
+  panel.style.display='block';
 
   const all=calcAllMarkets();
-  const best=getBestSignal();
+  const best=getBestSignal(all);
   const vel=_getVelocity();
 
-  const hdr='<div style="font-family:\'IBM Plex Mono\',monospace;font-size:8px;color:var(--mut);letter-spacing:2.5px;text-transform:uppercase;margin-bottom:7px">◈ BEST SIGNAL NOW</div>';
+  // ── BEST SIGNAL header ──
+  const bestCol = best ? (VERDICT_COLOR[best.verdict]||'var(--r)') : '#444';
+  const bestGlow = best&&best.verdict==='HIGH ALERT' ? '0 0 20px rgba(255,255,255,.12)' :
+                   best&&best.verdict==='ENTER'       ? '0 0 14px rgba(0,255,136,.1)' : 'none';
+  const velHint = vel&&vel.score>5  ? `<span style="color:var(--g);font-size:8px">⬆ +${vel.score}</span>` :
+                  vel&&vel.score<-5 ? `<span style="color:var(--r);font-size:8px">⬇ ${vel.score}</span>` : '';
 
+  let bsnHtml;
   if(!best){
-    panel.style.borderColor='var(--border)';
-    panel.style.boxShadow='none';
-    // Still show all-market status
-    const allRow=all.map(d=>{
-      const cls=d.invalidated?'#444':VERDICT_COLOR[getVerdict(d.score,d.invalidated)]||'#555';
-      const lbl=d.invalidated?'INVALID':d.score+'';
-      return`<span style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:${cls}">${MKT[d.market]}: ${lbl}</span>`;
-    }).join('<span style="color:#333"> · </span>');
-    panel.innerHTML=hdr+
-      '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;color:#555;letter-spacing:2px;text-align:center;padding:4px 0">— NO STRONG EDGE —</div>'+
-      '<div style="margin-top:7px;padding-top:6px;border-top:1px solid var(--border)">'+allRow+'</div>';
-    return;
+    bsnHtml=`<div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#555;letter-spacing:2px;padding:6px 0">— NO STRONG EDGE —</div>`;
+  }else{
+    const reason=(best.reasons||[]).find(r=>r&&r.length>4)||'';
+    bsnHtml=`
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">
+        <div style="font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;color:${bestCol};letter-spacing:.5px">
+          ${MKT_ICON[best.market]} ${MKT[best.market]}
+        </div>
+        <div style="display:flex;align-items:baseline;gap:5px">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:700;color:${bestCol}">${best.score}</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--mut)">/100</span>
+          ${velHint}
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${reason?4:0}px">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--mut);letter-spacing:.5px">BEST SIGNAL NOW</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:${bestCol};letter-spacing:1px">${best.verdict}</div>
+      </div>
+      ${reason?`<div style="font-size:9px;color:var(--text2);line-height:1.45;margin-bottom:2px">${reason}</div>`:''}`;
   }
 
-  const col=VERDICT_COLOR[best.verdict]||'var(--r)';
-  const glow=best.verdict==='HIGH ALERT'?`0 0 18px rgba(255,255,255,.15)`:
-             best.verdict==='ENTER'?`0 0 14px rgba(0,255,136,.12)`:'none';
-  panel.style.borderColor=col;
-  panel.style.boxShadow=glow;
+  // ── ALL MARKETS compact rows ──
+  const rowsHtml=all.map(d=>{
+    const v=d.verdict;
+    const col=d.invalidated?'#444':VERDICT_COLOR[v]||'#555';
+    const scoreStr=d.invalidated?'—':String(d.score);
+    const verdictStr=d.invalidated?d.invalidReason.slice(0,20):(v==='NO BET'&&!d.invalidated?'NO BET':v);
+    const isBest=best&&d.market===best.market;
+    const rowBg=isBest?`rgba(${v==='HIGH ALERT'?'255,255,255':v==='ENTER'?'0,255,136':v==='WAIT'?'255,179,0':'100,100,100'},.04)`:'transparent';
+    const topReason=(d.reasons||[]).find(r=>r&&r.length>4)||'';
+    return`<div style="display:flex;align-items:center;gap:0;padding:5px 7px;border-radius:4px;background:${rowBg};border-left:2px solid ${isBest?col:'transparent'};margin-bottom:2px;transition:background .2s">
+      <span style="font-size:11px;flex-shrink:0;width:18px">${MKT_ICON[d.market]}</span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:${d.invalidated?'#555':'var(--text2)'};flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${MKT[d.market]}</span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:${col};width:26px;text-align:right;flex-shrink:0">${scoreStr}</span>
+      <span style="font-family:'IBM Plex Mono',monospace;font-size:7px;color:${col};width:54px;text-align:right;flex-shrink:0;letter-spacing:.3px">${verdictStr}</span>
+    </div>
+    ${(!d.invalidated&&d.score>=36&&topReason)?`<div style="font-size:8px;color:var(--mut);padding:0 7px 3px 37px;line-height:1.4">${topReason}</div>`:''}`;
+  }).join('');
 
-  // Top reason (first non-empty reason from engine)
-  const reason=(best.reasons||[]).find(r=>r.length>0)||'';
-  // Velocity hint
-  const velHint=vel&&vel.score>5?`<span style="color:var(--g)">⬆ Signal rastie (+${vel.score})</span>`:
-                vel&&vel.score<-5?`<span style="color:var(--r)">⬇ Signal klesa (${vel.score})</span>`:'';
-  // Other markets row
-  const others=all.filter(d=>d.market!==best.market).map(d=>{
-    const v=getVerdict(d.score,d.invalidated);
-    const c=d.invalidated?'#444':VERDICT_COLOR[v]||'#555';
-    const lbl=d.invalidated?'×':d.score+'';
-    return`<span style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:${c}">${MKT[d.market]}: ${lbl}</span>`;
-  }).join('<span style="color:#333"> · </span>');
-
-  panel.innerHTML=hdr+
-    `<div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:5px">
-       <div style="font-family:'Orbitron',sans-serif;font-size:13px;font-weight:700;color:${col};letter-spacing:1px">${MKT[best.market]}</div>
-       <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:${col};letter-spacing:1px">${best.verdict}</div>
-     </div>
-     <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:6px">
-       <span style="font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:700;color:${col};text-shadow:0 0 14px ${col}40">${best.score}</span>
-       <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--mut)">/100</span>
-       ${velHint?`<span style="font-family:'IBM Plex Mono',monospace;font-size:9px">${velHint}</span>`:''}
-     </div>
-     ${reason?`<div style="font-size:10px;color:var(--text2);line-height:1.5;margin-bottom:6px">${reason}</div>`:''}
-     <div style="padding-top:5px;border-top:1px solid var(--border)">${others}</div>`;
+  panel.style.boxShadow=bestGlow;
+  panel.innerHTML=`
+    <div style="background:var(--bg2);border:1px solid ${bestCol};border-radius:6px;padding:9px 11px;transition:border-color .35s,box-shadow .35s">
+      ${bsnHtml}
+      <div style="height:1px;background:var(--border);margin:7px 0 5px"></div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:7px;color:var(--mut);letter-spacing:2px;text-transform:uppercase;margin-bottom:5px">// ALL MARKETS</div>
+      ${rowsHtml}
+    </div>`;
 }
 
 // ── AI MESSAGES ──
@@ -2129,6 +2134,7 @@ async function applyMatchStats(triggerRun=false){
     const wd=calcScore();
     _pushSnapshot(wd);
     watchSignal(wd, getVerdict(wd.score,wd.invalidated));
+    _renderBestSignal();
 
     // 5. Auto-run scoring on first match selection
     if(triggerRun) run();
