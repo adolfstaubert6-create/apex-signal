@@ -1408,63 +1408,116 @@ function _renderBestSignal(){
   const best=getBestSignal(all);
   const vel=_getVelocity();
 
-  // ── BEST SIGNAL header ──
-  const bestCol = best ? (VERDICT_COLOR[best.verdict]||'var(--r)') : '#444';
-  const bestGlow = best&&best.verdict==='HIGH ALERT' ? '0 0 20px rgba(255,255,255,.12)' :
-                   best&&best.verdict==='ENTER'       ? '0 0 14px rgba(0,255,136,.1)' : 'none';
-  const velHint = vel&&vel.score>5  ? `<span style="color:var(--g);font-size:8px">⬆ +${vel.score}</span>` :
-                  vel&&vel.score<-5 ? `<span style="color:var(--r);font-size:8px">⬇ ${vel.score}</span>` : '';
+  // ── Velocity text: specific rising/falling metrics ──
+  function velText(){
+    if(!vel) return '';
+    const up=[],dn=[];
+    if(vel.xg>=0.15)       up.push('xG');      else if(vel.xg<=-0.15)    dn.push('xG');
+    if(vel.attacks>=6)     up.push('útoky');   else if(vel.attacks<=-6)  dn.push('útoky');
+    if(vel.pressure>=1)    up.push('tlak');    else if(vel.pressure<=-1) dn.push('tlak');
+    if(vel.shots>=2)       up.push('strely');  else if(vel.shots<=-2)    dn.push('strely');
+    if(!up.length&&!dn.length) return '';
+    const p=[];
+    if(up.length) p.push('<span style="color:var(--g)">↑ '+up.join(', ')+'</span>');
+    if(dn.length) p.push('<span style="color:#c05;">↓ '+dn.join(', ')+'</span>');
+    return p.join(' &nbsp;');
+  }
+  const vt=velText();
 
-  let bsnHtml;
+  // ── Verdict colors — muted NO BET, no aggressive glow ──
+  function vCol(v,inv){
+    if(inv)  return '#3a3a3a';
+    if(v==='HIGH ALERT') return '#ffffff';
+    if(v==='ENTER')      return 'var(--g)';
+    if(v==='WAIT')       return 'var(--a)';
+    if(v==='WATCH')      return '#8a8a8a';
+    return 'rgba(255,45,85,.55)'; // NO BET — muted, not casino-red
+  }
+
+  // ── Panel border & glow — only for actionable signals ──
+  const borderCol = best
+    ? (best.verdict==='HIGH ALERT'?'rgba(255,255,255,.35)':best.verdict==='ENTER'?'rgba(0,255,136,.35)':best.verdict==='WAIT'?'rgba(255,179,0,.25)':'var(--border)')
+    : 'var(--border)';
+  const panelGlow = best&&(best.verdict==='HIGH ALERT'||best.verdict==='ENTER')
+    ? (best.verdict==='HIGH ALERT'?'0 0 16px rgba(255,255,255,.08)':'0 0 12px rgba(0,255,136,.07)')
+    : 'none';
+
+  // ── BEST SIGNAL NOW section ──
+  let bsnSection;
   if(!best){
-    bsnHtml=`<div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:#555;letter-spacing:2px;padding:6px 0">— NO STRONG EDGE —</div>`;
+    bsnSection=`
+      <div style="padding:10px 0 8px">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--mut);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px">◈ BEST SIGNAL NOW</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:12px;color:#444;letter-spacing:2px;text-align:center;padding:4px 0">— NO STRONG EDGE —</div>
+        ${vt?`<div style="font-family:'IBM Plex Mono',monospace;font-size:9px;margin-top:6px;text-align:center">${vt}</div>`:''}
+      </div>`;
   }else{
-    const reason=(best.reasons||[]).find(r=>r&&r.length>4)||'';
-    bsnHtml=`
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px">
-        <div style="font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;color:${bestCol};letter-spacing:.5px">
-          ${MKT_ICON[best.market]} ${MKT[best.market]}
+    const bc=vCol(best.verdict,false);
+    const reason=(best.reasons||[]).find(r=>r&&r.length>4&&!r.startsWith('Cas:')&&!r.startsWith('⏱'))||'';
+    bsnSection=`
+      <div style="padding:2px 0 8px">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:7px;color:var(--mut);letter-spacing:2.5px;text-transform:uppercase;margin-bottom:7px">◈ BEST SIGNAL NOW</div>
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px;margin-bottom:5px">
+          <div>
+            <div style="font-family:'Orbitron',sans-serif;font-size:13px;font-weight:700;color:${bc};letter-spacing:.3px;line-height:1.2">${MKT_ICON[best.market]}&nbsp;${MKT[best.market]}</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:${bc};letter-spacing:1px;margin-top:2px">${best.verdict}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:28px;font-weight:700;color:${bc};line-height:1;${best.verdict==='HIGH ALERT'?'text-shadow:0 0 18px rgba(255,255,255,.4)':best.verdict==='ENTER'?'text-shadow:0 0 14px rgba(0,255,136,.35)':''}">${best.score}</div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--mut);line-height:1.2">/100</div>
+          </div>
         </div>
-        <div style="display:flex;align-items:baseline;gap:5px">
-          <span style="font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:700;color:${bestCol}">${best.score}</span>
-          <span style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--mut)">/100</span>
-          ${velHint}
-        </div>
-      </div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${reason?4:0}px">
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--mut);letter-spacing:.5px">BEST SIGNAL NOW</div>
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:${bestCol};letter-spacing:1px">${best.verdict}</div>
-      </div>
-      ${reason?`<div style="font-size:9px;color:var(--text2);line-height:1.45;margin-bottom:2px">${reason}</div>`:''}`;
+        ${reason?`<div style="font-size:9px;color:var(--text2);line-height:1.5;margin-bottom:${vt?4:0}px">${reason}</div>`:''}
+        ${vt?`<div style="font-family:'IBM Plex Mono',monospace;font-size:9px;line-height:1.6">${vt} <span style="color:var(--mut)">momentum</span></div>`:''}
+      </div>`;
   }
 
   // ── ALL MARKETS compact rows ──
   const rowsHtml=all.map(d=>{
     const v=d.verdict;
-    const col=d.invalidated?'#444':VERDICT_COLOR[v]||'#555';
-    const scoreStr=d.invalidated?'—':String(d.score);
-    const verdictStr=d.invalidated?d.invalidReason.slice(0,20):(v==='NO BET'&&!d.invalidated?'NO BET':v);
+    const col=vCol(v,d.invalidated);
     const isBest=best&&d.market===best.market;
-    const rowBg=isBest?`rgba(${v==='HIGH ALERT'?'255,255,255':v==='ENTER'?'0,255,136':v==='WAIT'?'255,179,0':'100,100,100'},.04)`:'transparent';
-    const topReason=(d.reasons||[]).find(r=>r&&r.length>4)||'';
-    return`<div style="display:flex;align-items:center;gap:0;padding:5px 7px;border-radius:4px;background:${rowBg};border-left:2px solid ${isBest?col:'transparent'};margin-bottom:2px;transition:background .2s">
-      <span style="font-size:11px;flex-shrink:0;width:18px">${MKT_ICON[d.market]}</span>
-      <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:${d.invalidated?'#555':'var(--text2)'};flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${MKT[d.market]}</span>
-      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;color:${col};width:26px;text-align:right;flex-shrink:0">${scoreStr}</span>
-      <span style="font-family:'IBM Plex Mono',monospace;font-size:7px;color:${col};width:54px;text-align:right;flex-shrink:0;letter-spacing:.3px">${verdictStr}</span>
-    </div>
-    ${(!d.invalidated&&d.score>=36&&topReason)?`<div style="font-size:8px;color:var(--mut);padding:0 7px 3px 37px;line-height:1.4">${topReason}</div>`:''}`;
+    const scoreStr=d.invalidated?'—':String(d.score);
+
+    // Verdict label — shorter for inactive states
+    let vLabel;
+    if(d.invalidated)           vLabel='neaktívny';
+    else if(v==='HIGH ALERT')   vLabel='ALARM';
+    else if(v==='ENTER')        vLabel='ENTER';
+    else if(v==='WAIT')         vLabel='POČKAŤ';
+    else if(v==='WATCH')        vLabel='SLEDUJ';
+    else                        vLabel='NO BET';
+
+    // Readable name color: active markets get var(--text2), low/invalid get dimmer
+    const nameCol=d.invalidated?'#484848':d.score<36?'#666':'var(--text2)';
+    const scoreFontSize=d.invalidated?'9px':'11px';
+    const rowBg=isBest?`rgba(${v==='HIGH ALERT'?'255,255,255':v==='ENTER'?'0,255,136':v==='WAIT'?'255,179,0':'120,120,120'},.035)`:'transparent';
+    const borderL=isBest?`2px solid ${col}`:'2px solid transparent';
+
+    // Short reason for WATCH/WAIT/ENTER rows (not best — that's above)
+    const rowReason=(!isBest&&!d.invalidated&&d.score>=36)?((d.reasons||[]).find(r=>r&&r.length>4&&!r.startsWith('Cas:'))||''):'';
+
+    return`<div style="padding:4px 7px;border-radius:3px;background:${rowBg};border-left:${borderL};margin-bottom:1px">
+  <div style="display:flex;align-items:center;gap:0">
+    <span style="font-size:10px;flex-shrink:0;width:18px;opacity:${d.invalidated?.35:1}">${MKT_ICON[d.market]}</span>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:${nameCol};flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${MKT[d.market]}</span>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:${scoreFontSize};font-weight:700;color:${col};width:24px;text-align:right;flex-shrink:0">${scoreStr}</span>
+    <span style="font-family:'IBM Plex Mono',monospace;font-size:7px;color:${col};width:52px;text-align:right;flex-shrink:0;letter-spacing:.2px">${vLabel}</span>
+  </div>
+  ${rowReason?`<div style="font-size:8px;color:#666;padding:1px 0 0 18px;line-height:1.4">${rowReason}</div>`:''}
+</div>`;
   }).join('');
 
-  panel.style.boxShadow=bestGlow;
+  panel.style.boxShadow=panelGlow;
   panel.innerHTML=`
-    <div style="background:var(--bg2);border:1px solid ${bestCol};border-radius:6px;padding:9px 11px;transition:border-color .35s,box-shadow .35s">
-      ${bsnHtml}
-      <div style="height:1px;background:var(--border);margin:7px 0 5px"></div>
+    <div style="background:var(--bg2);border:1px solid ${borderCol};border-radius:6px;padding:10px 12px;transition:border-color .4s,box-shadow .4s">
+      ${bsnSection}
+      <div style="height:1px;background:var(--border);margin:4px 0 8px"></div>
       <div style="font-family:'IBM Plex Mono',monospace;font-size:7px;color:var(--mut);letter-spacing:2px;text-transform:uppercase;margin-bottom:5px">// ALL MARKETS</div>
       ${rowsHtml}
     </div>`;
 }
+
 
 // ── AI MESSAGES ──
 const AI={
