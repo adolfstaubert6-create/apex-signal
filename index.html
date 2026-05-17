@@ -233,10 +233,15 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
   animation:sbScan 5s linear infinite;
 }
 @keyframes sbScan{0%{top:0;opacity:0}5%{opacity:.4}94%{opacity:.4}100%{top:100%;opacity:0}}
+.vs-ha{border-color:#fff;color:#fff;background:rgba(255,255,255,.04);box-shadow:0 0 30px rgba(255,255,255,.18),inset 0 0 24px rgba(255,255,255,.06);animation:haPulse 1s ease-in-out infinite;}
+.vs-ha .vtxt{color:#fff;text-shadow:0 0 24px #fff,0 0 60px rgba(255,255,255,.5);animation:haPulse 1s ease-in-out infinite;}
+@keyframes haPulse{0%,100%{box-shadow:0 0 30px rgba(255,255,255,.18),inset 0 0 24px rgba(255,255,255,.06)}50%{box-shadow:0 0 50px rgba(255,255,255,.38),inset 0 0 40px rgba(255,255,255,.12)}}
 .vs-v{border-color:var(--g);color:var(--g);background:rgba(0,255,136,.04);box-shadow:0 0 18px rgba(0,255,136,.1),inset 0 0 18px rgba(0,255,136,.04);}
 .vs-v .vtxt{color:var(--g);animation:vgp 1.6s ease-in-out infinite;}
 .vs-a{border-color:var(--a);color:var(--a);background:rgba(255,179,0,.04);box-shadow:0 0 18px rgba(0,255,179,.1),inset 0 0 18px rgba(255,179,0,.04);}
 .vs-a .vtxt{color:var(--a);text-shadow:0 0 20px var(--a),0 0 50px var(--ag);animation:agp 2s ease-in-out infinite alternate;}
+.vs-wt{border-color:#555;color:#777;background:rgba(100,100,100,.03);box-shadow:none;}
+.vs-wt .vtxt{color:#888;}
 .vs-r{border-color:var(--r);color:var(--r);background:rgba(255,45,85,.04);box-shadow:0 0 18px rgba(255,45,85,.1),inset 0 0 18px rgba(255,45,85,.04);}
 .vs-r .vtxt{color:var(--r);text-shadow:0 0 20px var(--r),0 0 50px var(--rg);animation:rgp 2s ease-in-out infinite alternate;}
 @keyframes vgp{
@@ -835,9 +840,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
       <div class="fg"><label>Minúta</label><input type="number" id="minute" value="45" min="1" max="90" oninput="lu()"/></div>
       <div class="fg"><label>Market</label>
         <select id="market" onchange="lu()">
-          <option value="over05">OVER 0.5 GÓLOV</option>
-          <option value="over25">OVER 2.5 GÓLOV</option>
-          <option value="btts">BTTS — OBA SKÓRUJÚ</option>
+          <option value="goal_alert">GOAL ALERT</option>
+          <option value="btts">BOTH TEAMS SCORE</option>
+          <option value="next_goal">NEXT GOAL</option>
+          <option value="late_goal">LATE GOAL</option>
         </select>
       </div>
       <div class="dvd"></div>
@@ -1043,9 +1049,51 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;heigh
 
 <script>
 // ── CONSTANTS ──
-const MKT={over05:'OVER 0.5',over25:'OVER 2.5',btts:'BTTS'};
+const MKT={
+  goal_alert:'GOAL ALERT', btts:'BTTS', next_goal:'NEXT GOAL', late_goal:'LATE GOAL',
+  over05:'OVER 0.5', over25:'OVER 2.5' // legacy labels for saved history entries
+};
 const LS='apex_v2';
 let mode='balanced';
+
+// ── VERDICT STATE LABELS (5 states) ──
+const VERDICT_LABEL  ={'HIGH ALERT':'ALARM!','ENTER':'VSTÚPIŤ','WAIT':'POČKAŤ','WATCH':'SLEDOVAŤ','NO BET':'NESTÁVKOVAŤ'};
+const VERDICT_COLOR  ={'HIGH ALERT':'#ffffff','ENTER':'var(--g)','WAIT':'var(--a)','WATCH':'#777','NO BET':'var(--r)'};
+const VERDICT_CSS_CLS={'HIGH ALERT':'vs-ha','ENTER':'vs-v','WAIT':'vs-a','WATCH':'vs-wt','NO BET':'vs-r'};
+
+// ── VELOCITY TRACKING ──
+const _snapshots=[];
+function _pushSnapshot(d){
+  _snapshots.push({ts:Date.now(),xg:d.xg,attacks:d.attacks,shots:d.shots,corners:d.corners,score:d.score,pressure:d.pressure,minute:d.minute});
+  if(_snapshots.length>4)_snapshots.shift();
+}
+function _getVelocity(){
+  if(_snapshots.length<2)return null;
+  const p=_snapshots[_snapshots.length-2],c=_snapshots[_snapshots.length-1];
+  return{xg:+(c.xg-p.xg).toFixed(2),attacks:c.attacks-p.attacks,shots:c.shots-p.shots,corners:c.corners-p.corners,score:c.score-p.score,pressure:c.pressure-p.pressure};
+}
+function _velArrow(v){return v>0?'⬆':v<0?'⬇':'→';}
+function _renderVelocity(){
+  let el=document.getElementById('velRow');
+  if(!el){const bw=document.getElementById('bdwrap');if(!bw)return;el=document.createElement('div');el.id='velRow';el.style.cssText='font-family:"IBM Plex Mono",monospace;font-size:9px;color:var(--mut);margin-top:6px;padding:5px 8px;background:rgba(255,255,255,.02);border-radius:4px;border:1px solid var(--border);letter-spacing:.5px;transition:color .3s';bw.appendChild(el);}
+  const v=_getVelocity();if(!v){el.textContent='→ Čakám na dáta...';return;}
+  const parts=[];
+  if(Math.abs(v.xg)>=0.1)parts.push(_velArrow(v.xg)+' xG '+(v.xg>0?'+':'')+v.xg);
+  if(Math.abs(v.attacks)>=3)parts.push(_velArrow(v.attacks)+' Útoky '+(v.attacks>0?'+':'')+v.attacks);
+  if(Math.abs(v.shots)>=1)parts.push(_velArrow(v.shots)+' Strely '+(v.shots>0?'+':'')+v.shots);
+  if(Math.abs(v.score)>=4)parts.push(_velArrow(v.score)+' Signál '+(v.score>0?'+':'')+v.score);
+  el.textContent='MOMENTUM: '+(parts.length?parts.join(' · '):'→ Stabilné');
+  el.style.color=v.score>=8?'var(--g)':v.score<=-8?'var(--r)':'var(--mut)';
+}
+function _renderReasons(reasons){
+  let wrap=document.getElementById('reasonWrap');
+  const bw=document.getElementById('bdwrap');if(!bw)return;
+  if(!wrap){wrap=document.createElement('div');wrap.id='reasonWrap';wrap.style.cssText='margin-top:6px;display:none';bw.appendChild(wrap);}
+  if(!reasons||!reasons.length){wrap.style.display='none';return;}
+  wrap.style.display='block';
+  wrap.innerHTML='<div style="font-family:\'IBM Plex Mono\',monospace;font-size:8px;color:var(--mut);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px">Analýza</div>'+
+    reasons.map(r=>`<div style="font-size:10px;color:var(--text2);line-height:1.5;margin-bottom:2px">◈ ${r}</div>`).join('');
+}
 
 // ── CLOCK ──
 setInterval(()=>{document.getElementById('tbClk').textContent=new Date().toTimeString().slice(0,8);},1000);
@@ -1105,174 +1153,199 @@ function calcScore(){
   const sA      =parseInt(document.getElementById('scoreA').value)||0;
   const market  =document.getElementById('market').value;
   const total   =sH+sA;
-
-  // ── NORMALIZATION (cap raw values before scoring) ──
+  const diff    =Math.abs(sH-sA);
   const shots   =Math.min(parseInt(document.getElementById('s-shots').value)||0,   25);
   const attacks =Math.min(parseInt(document.getElementById('s-attacks').value)||0, 120);
   const corners =Math.min(parseInt(document.getElementById('s-corners').value)||0,  15);
   const poss    =parseInt(document.getElementById('s-poss').value)||50;
   const xg      =parseInt(document.getElementById('s-xg').value)/100;
   const pressure=Math.min(Math.round(attacks/18),10)||parseInt(document.getElementById('s-pressure').value)||1;
-  let sc=0; const bd=[];
+  const remaining=Math.max(0,90-minute);
+  let sc=0; const bd=[]; const reasons=[]; let invalidated=false; let invalidReason='';
 
-  function add(label,pts,ok){ if(ok){sc+=pts;bd.push({l:label,p:'+'+pts,ok:true});}else{bd.push({l:label,p:'0',ok:false});} }
-
-  if(market==='over05'){
-    // Minute
-    if(minute>=60&&minute<=78)                                     add('Minúta 60–78',15,true);
-    else if((minute>=50&&minute<=59)||(minute>=79&&minute<=85))    add('Minúta 50–59 / 79–85',8,true);
-    else                                                            add('Minúta mimo okna',0,false);
-    // Score
-    if((sH===0&&sA===0)||(sH===1&&sA===0)||(sH===0&&sA===1)||(sH===1&&sA===1)) add('Skóre 0:0/1:0/0:1/1:1',15,true);
-    else if((sH===2&&sA===1)||(sH===1&&sA===2))                   add('Skóre 2:1 / 1:2',10,true);
-    else                                                            add('Skóre nevyhovuje',0,false);
-    // xG
-    if(xg>=2.0)      add('xG ≥ 2.0',20,true);
-    else if(xg>=1.6) add('xG ≥ 1.6',15,true);
-    else if(xg>=1.2) add('xG ≥ 1.2',8,true);
-    else             add('xG < 1.2',0,false);
-    // Shots
-    if(shots>=6)      add('Strely ≥ 6',15,true);
-    else if(shots>=4) add('Strely 4–5',10,true);
-    else if(shots>=2) add('Strely 2–3',5,true);
-    else              add('Strely < 2',0,false);
-    // Attacks
-    if(attacks>=50)      add('Útoky ≥ 50',15,true);
-    else if(attacks>=35) add('Útoky 35–49',10,true);
-    else if(attacks>=20) add('Útoky 20–34',5,true);
-    else                 add('Útoky < 20',0,false);
-    // Pressure
-    if(pressure>=8)      add('Tlak 8–10',15,true);
-    else if(pressure>=6) add('Tlak 6–7',10,true);
-    else if(pressure>=4) add('Tlak 4–5',5,true);
-    else                 add('Tlak < 4',0,false);
-    // Corners
-    if(corners>=8)      add('Rohy ≥ 8',5,true);
-    else if(corners>=5) add('Rohy 5–7',3,true);
-    else                add('Rohy < 5',0,false);
-
-  } else if(market==='over25'){
-    // Goals
-    if(total>=2)      add('Góly: 2+',25,true);
-    else if(total===1) add('Góly: 1',15,true);
-    else              add('Góly: 0',5,true); // still 5 pts
-    // Minute
-    if(minute>=30&&minute<=70)      add('Minúta 30–70',15,true);
-    else if(minute>=71&&minute<=80) add('Minúta 71–80',8,true);
-    else                            add('Minúta mimo okna',0,false);
-    // xG
-    if(xg>=2.5)      add('xG ≥ 2.5',20,true);
-    else if(xg>=2.0) add('xG ≥ 2.0',15,true);
-    else if(xg>=1.5) add('xG ≥ 1.5',8,true);
-    else             add('xG < 1.5',0,false);
-    // Shots
-    if(shots>=7)      add('Strely ≥ 7',15,true);
-    else if(shots>=5) add('Strely 5–6',10,true);
-    else if(shots>=3) add('Strely 3–4',5,true);
-    else              add('Strely < 3',0,false);
-    // Pressure
-    if(pressure>=8)      add('Tlak 8–10',10,true);
-    else if(pressure>=6) add('Tlak 6–7',7,true);
-    else if(pressure>=4) add('Tlak 4–5',3,true);
-    else                 add('Tlak < 4',0,false);
-    // Attacks
-    if(attacks>=55)      add('Útoky ≥ 55',10,true);
-    else if(attacks>=35) add('Útoky 35–54',7,true);
-    else if(attacks>=20) add('Útoky 20–34',3,true);
-    else                 add('Útoky < 20',0,false);
-    // Corners
-    if(corners>=8)      add('Rohy ≥ 8',5,true);
-    else if(corners>=5) add('Rohy 5–7',3,true);
-    else                add('Rohy < 5',0,false);
-
-  } else {
-    // BTTS
-    // Score
-    if((sH===1&&sA===0)||(sH===0&&sA===1))                        add('Skóre 1:0 / 0:1',20,true);
-    else if(sH===0&&sA===0)                                        add('Skóre 0:0',15,true);
-    else if((sH===2&&sA===0)||(sH===0&&sA===2))                   add('Skóre 2:0 / 0:2',8,true);
-    else if(sH>0&&sA>0)                                            add('Oba skórovali',10,true);
-    else                                                            add('Skóre nevyhovuje',0,false);
-    // Minute
-    if(minute>=25&&minute<=70)      add('Minúta 25–70',15,true);
-    else if(minute>=71&&minute<=80) add('Minúta 71–80',8,true);
-    else                            add('Minúta mimo okna',0,false);
-    // xG
-    if(xg>=2.0)      add('xG ≥ 2.0',15,true);
-    else if(xg>=1.5) add('xG ≥ 1.5',10,true);
-    else if(xg>=1.0) add('xG ≥ 1.0',5,true);
-    else             add('xG < 1.0',0,false);
-    // Shots (proxy for both teams)
-    if(shots>=4)      add('Strely: oba ≥ 2',15,true);
-    else if(shots>=3) add('Strely: 1 tím ≥ 2',8,true);
-    else              add('Strely nedostatočné',0,false);
-    // Attacks
-    if(attacks>=50)      add('Útoky ≥ 50',15,true);
-    else if(attacks>=35) add('Útoky ≥ 35',10,true);
-    else                 add('Útoky < 35',0,false);
-    // Pressure
-    if(pressure>=8)      add('Tlak 8–10',10,true);
-    else if(pressure>=6) add('Tlak 6–7',7,true);
-    else if(pressure>=4) add('Tlak 4–5',3,true);
-    else                 add('Tlak < 4',0,false);
-    // Possession
-    if(poss>=45&&poss<=55)         add('Possession 45–55%',10,true);
-    else if(poss>=40&&poss<=60)    add('Possession 40–60%',5,true);
-    else                           add('Possession mimo 40–60%',0,false);
+  function add(label,pts,ok,reason){
+    if(ok){sc+=pts;bd.push({l:label,p:'+'+pts,ok:true});}else{bd.push({l:label,p:'0',ok:false});}
+    if(reason)reasons.push(reason);
+  }
+  function hardGate(condition,reason){
+    if(!condition){invalidated=true;invalidReason=reason;}
+    return condition;
   }
 
-  sc=Math.min(100,Math.max(0,sc));
-  return{score:sc,breakdown:bd,minute,sH,sA,market,shots,attacks,corners,poss,xg,pressure,total};
-}
+  // ── GOAL ALERT ── hard gate 40-88'
+  if(market==='goal_alert'){
+    if(hardGate(minute>=40&&minute<=88,"GOAL ALERT: aktivny len 40-88'")){
+      if(minute>=60&&minute<=80)       add("Optimalna zona 60-80'",18,true,"Min "+minute+"' — optimalne golove okno");
+      else if(minute>=50||minute<=85)  add("Aktivna zona",10,true);
+      else                             add("Okrajova zona",5,true);
+      if(diff===0)                     add('Remiza — maximalna tenzia',18,true,'Remiza: obidva timy utocaju, gol pravdepodobny');
+      else if(diff===1&&total<=4)      add('1-golovy rozdiel — urgencia',13,true,'Tim v minuse tlaci na vyrovnanie');
+      else if(diff===0&&total>0)       add('Remiza s golmi',15,true);
+      else                             add('Velky rozdiel — nizke riziko',0,false,'Skore '+sH+':'+sA+' znizuje pravdepodobnost');
+      if(xg>=2.0)      add('xG >= 2.0',20,true,'xG '+xg.toFixed(2)+' — silny golovy potential');
+      else if(xg>=1.5) add('xG >= 1.5',14,true,'xG '+xg.toFixed(2)+' — dobry golovy potential');
+      else if(xg>=1.0) add('xG >= 1.0',7,true);
+      else             add('Nizke xG',0,false,'xG '+xg.toFixed(2)+' — nedostatok goloveho potentialu');
+      if(shots>=6)      add('Strely >= 6',14,true);
+      else if(shots>=4) add('Strely 4-5',9,true);
+      else if(shots>=2) add('Strely 2-3',4,true);
+      else              add('Strely < 2',0,false);
+      if(attacks>=50)      add('Utoky >= 50',14,true);
+      else if(attacks>=35) add('Utoky 35-49',9,true);
+      else if(attacks>=20) add('Utoky 20-34',4,true);
+      else                 add('Utoky < 20',0,false);
+      if(corners>=8)      add('Rohy >= 8',10,true,'Rohovy tlak zvysuje sance na gol');
+      else if(corners>=5) add('Rohy 5-7',6,true);
+      else                add('Rohy < 5',0,false);
+      if(minute>=70&&minute<=83&&diff<=1&&xg>=1.5) add("Zaverecna urgencia 70-83'",5,true,'Zaver zapasu s napatim — golovy tlak rastie');
+    }
 
-function getVerdict(sc){
-  if(sc>=70) return'VSTÚPIŤ';
-  if(sc>=45) return'POČKAŤ';
-  return'NESTÁVKOVAŤ';
-}
+  // ── BOTH TEAMS SCORE ──
+  }else if(market==='btts'){
+    if(sH>0&&sA>0){
+      invalidated=true;invalidReason='BTTS UZ ROZHODNUTY — obidva timy skorovali';
+    }else if(diff>=2&&minute>70){
+      invalidated=true;invalidReason="2+ golovy rozdiel po 70' — BTTS prakticky nemozne";
+    }else if(hardGate(minute>=15&&minute<=75,"BOTH TEAMS SCORE: aktivny len 15-75'")){
+      if((sH===1&&sA===0)||(sH===0&&sA===1)) add('Skore 1:0/0:1 — chybajuci gol',22,true,(sH>sA?'Host':'Domaci')+' musi skorovat — utocna reakcia pravdepodobna');
+      else if(sH===0&&sA===0)                add('0:0 — obidva este neskorovali',17,true,'0:0 — BTTS plne otvorene');
+      else if(diff===2)                      add('2-golovy rozdiel — tazke ale mozne',5,true);
+      else                                   add('Skore znizuje BTTS sance',0,false);
+      if(minute>=45&&minute<=65)   add("BTTS optimum 45-65'",16,true,"Minuta "+minute+"' — optimalne BTTS okno");
+      else                         add('BTTS aktivna zona',9,true);
+      if(xg>=2.0)      add('Celkove xG >= 2.0',17,true,'xG '+xg.toFixed(2)+' — obidva timy vytvaraju sance');
+      else if(xg>=1.5) add('Celkove xG >= 1.5',12,true,'xG '+xg.toFixed(2));
+      else if(xg>=1.0) add('Celkove xG >= 1.0',6,true);
+      else             add('Nizke xG — malo sanci',0,false,'xG '+xg.toFixed(2));
+      if(poss>=43&&poss<=57)       add('Vyvazena hra 43-57%',12,true,'Vyvazena possession — obidva timy ofenzivne');
+      else if(poss>=37&&poss<=63)  add('Relativne vyvazena hra',7,true);
+      else                         add('Jednostranna dominancia',0,false,'Jednostranna dominancia znizuje BTTS');
+      if(shots>=5)      add('Strely >= 5',12,true);
+      else if(shots>=3) add('Strely 3-4',7,true);
+      else              add('Nizky pocet streli',0,false);
+      if(attacks>=45)      add('Utoky >= 45',10,true);
+      else if(attacks>=30) add('Utoky 30-44',6,true);
+      else                 add('Utoky < 30',0,false);
+    }
 
-function getStake(sc,m){
-  if(sc<45) return'—';
-  if(sc>=70){
-    if(m==='safe')      return'1–2%';
-    if(m==='balanced')  return'2–3%';
-    return'3–5%';
+  // ── NEXT GOAL ──
+  }else if(market==='next_goal'){
+    if(hardGate(minute>=20&&minute<=85,"NEXT GOAL: aktivny len 20-85'")){
+      if(diff===0)         add('Remiza — maximalna urgentnost',20,true,'Remiza: obidva timy tlacia na veduci gol');
+      else if(diff===1)    add('1-golovy rozdiel — tim v minuse utoci',16,true,'Tim v minuse je pod tlakom — utoci zo vsetkych sil');
+      else if(diff===2)    add('2-golovy rozdiel — este hra',8,true);
+      else                 add('Velky rozdiel — nizka urgentnost',3,true);
+      if(xg>=1.8)      add('Silne xG >= 1.8',22,true,'xG '+xg.toFixed(2)+' — bezprostredne golove nebezpecenstvo');
+      else if(xg>=1.2) add('Dobre xG >= 1.2',15,true,'xG '+xg.toFixed(2)+' — aktivny utocny potential');
+      else if(xg>=0.7) add('Mierne xG >= 0.7',8,true);
+      else             add('Nizke xG',0,false,'xG '+xg.toFixed(2)+' — mala bezprostredna hrozba');
+      if(pressure>=8)      add('Extremny tlak 8-10',20,true,'Extremny tlak — gol je bezprostredny');
+      else if(pressure>=6) add('Vysoky tlak 6-7',13,true);
+      else if(pressure>=4) add('Mierny tlak 4-5',7,true);
+      else                 add('Nizky tlak',0,false,'Nizky tlak — gol nie je bezprostredny');
+      if(attacks>=55)      add('Utoky >= 55',15,true);
+      else if(attacks>=35) add('Utoky 35-54',9,true);
+      else if(attacks>=18) add('Utoky 18-34',4,true);
+      else                 add('Nizke utoky',0,false);
+      if(shots>=6)      add('Strely >= 6',12,true);
+      else if(shots>=4) add('Strely 4-5',7,true);
+      else if(shots>=2) add('Strely 2-3',3,true);
+      else              add('Ziadne strely',0,false);
+      if(minute>=65&&minute<=82) add("Zaverecne okno 65-82'",6,true,'Zaver zapasu zvysuje urgentnost');
+    }
+
+  // ── LATE GOAL ── (time-decayed scoring)
+  }else if(market==='late_goal'){
+    if(!hardGate(minute>=60&&minute<=88,"LATE GOAL: aktivny len 60-88'")){}
+    else if(!hardGate(xg>=1.0,'xG < 1.0 — minimalna hranica pre LATE GOAL')){}
+    else{
+      const tf=Math.max(0.5,1.0-(minute-60)/55);
+      function addT(label,rawPts,ok,reason){
+        const pts=Math.round(rawPts*tf);
+        if(ok){sc+=pts;bd.push({l:label,p:'+'+pts+' (x'+tf.toFixed(2)+')',ok:true});}
+        else{bd.push({l:label,p:'0',ok:false});}
+        if(reason)reasons.push(reason);
+      }
+      if(total===0&&minute>=70)     addT("0:0 neskoraj faza — extremna urgencia",28,true,"0:0 v "+minute+"' — obidva timy zufalo utocaju v zavere");
+      else if(diff===1&&minute>=65) addT('1-golovy rozdiel v zavere',24,true,'Tim v minuse v zavere utoci zo vsetkych sil');
+      else if(total===0)            addT('0:0 — zaverecny tlak rastie',22,true,'0:0 — zaver zapasu zvysuje golovy tlak');
+      else if(diff===1)             addT('1-golovy rozdiel',18,true);
+      else                          addT('Nizka urgentnost skore',8,true);
+      if(xg>=2.5)      addT('xG >= 2.5 — silny zaverecny naval',24,true,'xG '+xg.toFixed(2)+' — silny zaverecny potential');
+      else if(xg>=2.0) addT('xG >= 2.0 — dobry zaverecny tlak',19,true,'xG '+xg.toFixed(2));
+      else if(xg>=1.5) addT('xG >= 1.5',14,true);
+      else             addT('xG >= 1.0 (minimum)',8,true);
+      if(pressure>=8)      addT('Extremny zaverecny tlak',22,true,'Extremny zaverecny tlak — obrana sa tazko brani');
+      else if(pressure>=6) addT('Vysoky zaverecny tlak',15,true);
+      else if(pressure>=4) addT('Mierny zaverecny tlak',8,true);
+      else                 addT('Nizky tlak v zavere',0,false,'Nizky zaverecny tlak — gol nepravdepodobny');
+      if(attacks>=50)      addT('Utoky >= 50',14,true);
+      else if(attacks>=30) addT('Utoky 30-49',8,true);
+      else                 addT('Malo zaverecnych utokov',0,false);
+      if(corners>=7)      addT('Rohy >= 7 — zaverecny rohovy tlak',12,true,'Zaverecne rohy — priame nebezpecenstvo');
+      else if(corners>=4) addT('Rohy 4-6',7,true);
+      else                addT('Malo rohov',0,false);
+      const timeNote=tf<0.6?'Kriticky malo casu — len extremny tlak':tf<0.75?'Obmedzeny cas — tlak je rozhodujuci':'Dostatok zaverecneho priestoru';
+      reasons.push('Cas: '+timeNote+' ('+minute+"', tf="+tf.toFixed(2)+')');
+    }
   }
-  // POČKAŤ 45-69
-  if(m==='safe')      return'—';
-  if(m==='balanced')  return'1%';
-  return'1–2%';
+
+  sc=Math.min(100,Math.max(0,Math.round(sc)));
+  return{score:sc,breakdown:bd,reasons,invalidated,invalidReason,minute,sH,sA,market,shots,attacks,corners,poss,xg,pressure,total,remaining};
 }
 
-// ── LIVE CONDITIONS (center panel preview) ──
-// Thresholds mirror the highest-scoring tier in calcScore() so a green
-// checkmark means the criterion is at full value, not just partial.
+function getVerdict(sc,invalidated){
+  if(invalidated)return'NO BET';
+  if(sc>=82)return'HIGH ALERT';
+  if(sc>=68)return'ENTER';
+  if(sc>=52)return'WAIT';
+  if(sc>=36)return'WATCH';
+  return'NO BET';
+}
+
+function getStake(verdict,m){
+  if(verdict==='NO BET'||verdict==='WATCH')return'—';
+  if(verdict==='HIGH ALERT'){if(m==='safe')return'2-3%';if(m==='balanced')return'3-5%';return'4-6%';}
+  if(verdict==='ENTER'){if(m==='safe')return'1-2%';if(m==='balanced')return'2-3%';return'3-5%';}
+  if(m==='safe')return'—';if(m==='balanced')return'1%';return'1-2%';
+}
+
+
 function getConds(d){
   const{market:m,total,sH,sA,shots,attacks,corners,poss,xg,pressure,minute}=d;
-  if(m==='over05') return[
-    {t:'Minúta 60–78',   p:minute>=60&&minute<=78},      // 15pts tier
-    {t:'xG ≥ 2.0',       p:xg>=2.0},                    // 20pts tier
-    {t:'Strely ≥ 6',     p:shots>=6},                    // 15pts tier
-    {t:'Útoky ≥ 50',     p:attacks>=50},                 // 15pts tier
-    {t:'Tlak ≥ 8/10',    p:pressure>=8},                 // 15pts tier
-    {t:'Skóre OK',        p:(sH<=1&&sA<=1&&total<=2)||((sH===2&&sA===1)||(sH===1&&sA===2))},
+  const diff=Math.abs(sH-sA);
+  if(m==='goal_alert') return[
+    {t:"Okno 40-88'",         p:minute>=40&&minute<=88},
+    {t:'Napaty zapas',        p:diff<=1},
+    {t:'xG >= 2.0',           p:xg>=2.0},
+    {t:'Strely >= 6',         p:shots>=6},
+    {t:'Utoky >= 50',         p:attacks>=50},
+    {t:'Rohy >= 8',           p:corners>=8},
   ];
-  if(m==='over25') return[
-    {t:'Góly ≥ 2',        p:total>=2},                   // 25pts tier
-    {t:'Minúta 30–70',   p:minute>=30&&minute<=70},      // 15pts tier
-    {t:'xG ≥ 2.5',       p:xg>=2.5},                    // 20pts tier
-    {t:'Strely ≥ 7',     p:shots>=7},                    // 15pts tier
-    {t:'Útoky ≥ 55',     p:attacks>=55},                 // 10pts tier
-    {t:'Tlak ≥ 8/10',    p:pressure>=8},                 // 10pts tier
+  if(m==='btts') return[
+    {t:"Okno 15-75'",         p:minute>=15&&minute<=75},
+    {t:'Jeden tim skoroval',  p:(sH>0)!==(sA>0)},
+    {t:'xG >= 2.0',           p:xg>=2.0},
+    {t:'Vyvazena hra 43-57%', p:poss>=43&&poss<=57},
+    {t:'Strely >= 5',         p:shots>=5},
+    {t:'Utoky >= 45',         p:attacks>=45},
   ];
-  // BTTS
+  if(m==='next_goal') return[
+    {t:"Okno 20-85'",         p:minute>=20&&minute<=85},
+    {t:'xG >= 1.8',           p:xg>=1.8},
+    {t:'Tlak >= 8/10',        p:pressure>=8},
+    {t:'Utoky >= 55',         p:attacks>=55},
+    {t:'Napaty zapas (<=2 g)',p:diff<=1},
+    {t:'Strely >= 6',         p:shots>=6},
+  ];
+  // late_goal
   return[
-    {t:'Minúta 25–70',      p:minute>=25&&minute<=70},   // 15pts tier
-    {t:'xG ≥ 2.0',          p:xg>=2.0},                 // 15pts tier
-    {t:'Possession 45–55%', p:poss>=45&&poss<=55},       // 10pts tier
-    {t:'Strely ≥ 4',        p:shots>=4},                 // 15pts tier (max for BTTS)
-    {t:'Útoky ≥ 50',        p:attacks>=50},              // 15pts tier
-    {t:'Tlak ≥ 8/10',       p:pressure>=8},              // 10pts tier
+    {t:"Okno 60-88'",         p:minute>=60&&minute<=88},
+    {t:'xG >= 1.0 (min)',     p:xg>=1.0},
+    {t:'xG >= 2.0',           p:xg>=2.0},
+    {t:'Tlak >= 8/10',        p:pressure>=8},
+    {t:'Napaty zapas',        p:diff<=1},
+    {t:'Utoky >= 45',         p:attacks>=45},
   ];
 }
 
@@ -1283,19 +1356,21 @@ function rotateScan(){document.getElementById('smsg').textContent=SCAN_MSGS[sIdx
 setInterval(rotateScan,2600);
 
 function lu(){
-  const d=calcScore();const v=getVerdict(d.score);
-  const col=v==='VSTÚPIŤ'?'var(--g)':v==='POČKAŤ'?'var(--a)':'var(--r)';
+  const d=calcScore();
+  const v=getVerdict(d.score,d.invalidated);
+  const col=VERDICT_COLOR[v]||'var(--r)';
   setLvl('l-xg',d.xg/5);setLvl('l-shots',d.shots/40);setLvl('l-attacks',d.attacks/80);
   setLvl('l-corners',d.corners/20);setLvl('l-poss',Math.min(1,Math.max(0,1-Math.abs(d.poss-50)/20)));setLvl('l-pressure',(d.pressure-1)/9);
-  document.getElementById('lpNum').textContent=d.score;document.getElementById('lpNum').style.color=col;
-  document.getElementById('lpBar').style.width=d.score+'%';document.getElementById('lpBar').style.background=col;
+  document.getElementById('lpNum').textContent=d.invalidated?'—':d.score;
+  document.getElementById('lpNum').style.color=col;
+  document.getElementById('lpBar').style.width=(d.invalidated?0:d.score)+'%';
+  document.getElementById('lpBar').style.background=col;
   const vt=document.getElementById('lvtag');
-  vt.textContent=v==='VSTÚPIŤ'?'ENTER':v==='POČKAŤ'?'WAIT':'NO BET';vt.style.color=col;vt.style.borderColor=col;
-  // live conds
+  vt.textContent=v;vt.style.color=col;vt.style.borderColor=col;
   const g=document.getElementById('lcGrid');const conds=getConds(d);
   if(g.children.length!==conds.length){g.innerHTML='';conds.forEach(c=>{const div=document.createElement('div');div.className='lci '+(c.p?'pass':'fail');div.innerHTML=`<span class="lci-i">${c.p?'✓':'✗'}</span><span class="lci-t">${c.t}</span>`;g.appendChild(div);});}
   else[...g.children].forEach((el,i)=>{el.className='lci '+(conds[i].p?'pass':'fail');el.querySelector('.lci-i').textContent=conds[i].p?'✓':'✗';});
-  updateGraph(d.score);
+  updateGraph(d.invalidated?0:d.score);
   _lastCalcData=d;
 }
 
@@ -1509,62 +1584,79 @@ function run(){
     bar.className='lbar';btn.textContent='⬡ SPUSTIŤ ANALÝZU ⬡';btn.classList.remove('busy');scan.className='';
 
     const d=calcScore();
-    const verdict=getVerdict(d.score);
-    const stake=getStake(d.score,mode);
-    const hexcol=verdict==='VSTÚPIŤ'?'#00ff88':verdict==='POČKAŤ'?'#ffb300':'#ff2d55';
-    const cssCol=verdict==='VSTÚPIŤ'?'var(--g)':verdict==='POČKAŤ'?'var(--a)':'var(--r)';
+    const verdict=getVerdict(d.score,d.invalidated);
+    const stake=getStake(verdict,mode);
+    const cssCol=VERDICT_COLOR[verdict]||'var(--r)';
+    const hexcol=verdict==='HIGH ALERT'?'#ffffff':verdict==='ENTER'?'#00ff88':verdict==='WAIT'?'#ffb300':verdict==='WATCH'?'#777':'#ff2d55';
 
-    // SIGNAL LOCK or other verdict
-    if(verdict==='VSTÚPIŤ'){
+    // 5-state verdict display
+    if(verdict==='HIGH ALERT'||verdict==='ENTER'){
       document.querySelector('.col-center').style.borderRight='1px solid rgba(0,255,136,.5)';
       activateSignalLock();
-      setAiState('ok','SIGNÁL POTVRDENÝ');
-      setTbAi('SIGNÁL DETEGOVANÝ ◈ VSTUP POTVRDENÝ','live');
-    } else if(verdict==='POČKAŤ'){
-      setAiState('mo','MONITORUJEM');
-      setTbAi('MONITORUJEM ◈ VYČKÁVAM','warn');
-      document.getElementById('rBadge').textContent='MONITORUJEM';
-      document.getElementById('rBadge').style.color='#ffb300';
-      document.getElementById('rBadge').style.borderColor='rgba(255,179,0,.4)';
-    } else {
-      setAiState('le','NÍZKY EDGE');
-      setTbAi('NÍZKY EDGE ◈ VSTUP ZAMIETNUTÝ','red');
-      document.getElementById('rBadge').textContent='NÍZKY EDGE';
-      document.getElementById('rBadge').style.color='#ff2d55';
-      document.getElementById('rBadge').style.borderColor='rgba(255,45,85,.4)';
+      if(verdict==='HIGH ALERT'){
+        setAiState('ok','VYSOKY ALERT');setTbAi('VYSOKY ALERT — SILNY SIGNAL','live');
+        document.getElementById('rBadge').textContent='VYSOKY ALERT';
+        document.getElementById('rBadge').style.color='#fff';document.getElementById('rBadge').style.borderColor='rgba(255,255,255,.55)';
+      }else{
+        setAiState('ok','SIGNAL POTVRDENY');setTbAi('SIGNAL DETEGO VANY — VSTUP POTVRDENY','live');
+      }
+    }else if(verdict==='WAIT'){
+      setAiState('mo','MONITORUJEM');setTbAi('POCKAT — PODMIENKY RASTÚ','warn');
+      document.getElementById('rBadge').textContent='POCKAT';
+      document.getElementById('rBadge').style.color='#ffb300';document.getElementById('rBadge').style.borderColor='rgba(255,179,0,.4)';
+    }else if(verdict==='WATCH'){
+      setAiState('sb','SLEDOVAT');setTbAi('SLEDOVAT — PODMIENKY SLABE','');
+      document.getElementById('rBadge').textContent='SLEDOVAT';
+      document.getElementById('rBadge').style.color='#777';document.getElementById('rBadge').style.borderColor='rgba(119,119,119,.35)';
+    }else{
+      if(d.invalidated){
+        setAiState('le','NEPLATNY TRH');setTbAi('NEPLATNY — '+d.invalidReason.slice(0,35),'red');
+        document.getElementById('rBadge').textContent='NEPLATNE';
+      }else{
+        setAiState('le','NIZKY EDGE');setTbAi('NIZKY EDGE — VSTUP ZAMIETNUTY','red');
+        document.getElementById('rBadge').textContent='NIZKY EDGE';
+      }
+      document.getElementById('rBadge').style.color='#ff2d55';document.getElementById('rBadge').style.borderColor='rgba(255,45,85,.4)';
     }
     document.getElementById('cBadge').textContent='LIVE';
 
-    // Signal score animate
+    // Score animate
     const numEl=document.getElementById('snum');numEl.style.color=cssCol;numEl.style.textShadow=`0 0 20px ${hexcol}`;
-    let n=0;const step=Math.max(1,Math.ceil(d.score/60));
-    const ni=setInterval(()=>{n=Math.min(n+step,d.score);numEl.textContent=n;if(n>=d.score)clearInterval(ni);},15);
+    const displayScore=d.invalidated?0:d.score;
+    let n=0;const step=Math.max(1,Math.ceil(displayScore/60));
+    const ni=setInterval(()=>{n=Math.min(n+step,displayScore);numEl.textContent=n;if(n>=displayScore)clearInterval(ni);},15);
 
-    // Confidence
+    // Confidence bar
     const cfp=document.getElementById('cfp');const cfb=document.getElementById('cfbar');
     cfp.style.color=hexcol;cfb.style.background=hexcol;cfb.style.boxShadow=`0 0 7px ${hexcol}`;
-    let cn=0;setTimeout(()=>{cfb.style.width=d.score+'%';const ci=setInterval(()=>{cn=Math.min(cn+step,d.score);cfp.textContent=cn+'%';if(cn>=d.score)clearInterval(ci);},15);},100);
+    let cn=0;setTimeout(()=>{cfb.style.width=displayScore+'%';const ci=setInterval(()=>{cn=Math.min(cn+step,displayScore);cfp.textContent=cn+'%';if(cn>=displayScore)clearInterval(ci);},15);},100);
 
     // Prob badge
     const pb=document.getElementById('pbadge');pb.style.display='inline-flex';
-    const[bc,bt]=d.score>=70?['pb-h','VYSOKÁ PRAVDEPODOBNOSŤ']:d.score>=45?['pb-m','STREDNÁ PRAVDEPODOBNOSŤ']:['pb-l','NÍZKA PRAVDEPODOBNOSŤ'];
+    const[bc,bt]=verdict==='HIGH ALERT'?['pb-h','EXTREMNE SILNY SIGNAL']:verdict==='ENTER'?['pb-h','VYSOKA PRAVDEPODOBNOST']:verdict==='WAIT'?['pb-m','STREDNA PRAVDEPODOBNOST']:verdict==='WATCH'?['pb-l','SLABE PODMIENKY']:['pb-l','VSTUP ZAMIETNUTY'];
     pb.className='pbadge '+bc;document.getElementById('pbTxt').textContent=bt;
 
-    // Verdict
-    const vcls=verdict==='VSTÚPIŤ'?'vs-v':verdict==='POČKAŤ'?'vs-a':'vs-r';
-    document.getElementById('vbox').className='vbox '+vcls;
-    document.getElementById('vtxt').textContent=verdict;
-    document.getElementById('vsub').textContent=`${mode.toUpperCase()} · ${MKT[d.market]} · ${d.minute}'`;
+    // Verdict box
+    document.getElementById('vbox').className='vbox '+(VERDICT_CSS_CLS[verdict]||'vs-r');
+    document.getElementById('vtxt').textContent=d.invalidated?d.invalidReason.slice(0,22):(VERDICT_LABEL[verdict]||verdict);
+    document.getElementById('vsub').textContent=`${mode.toUpperCase()} · ${MKT[d.market]||d.market} · ${d.minute}'`;
 
-    // Stake
+    // Stake row
     document.getElementById('strow').style.display='flex';
     document.getElementById('stakeV').textContent=stake==='—'?'—':stake+' bankrollu';
-    document.getElementById('riskV').textContent=mode==='safe'?'NÍZKE':mode==='balanced'?'STREDNÉ':'VYSOKÉ';
-    document.getElementById('mktV').textContent=MKT[d.market];
+    document.getElementById('riskV').textContent=mode==='safe'?'NIZKE':mode==='balanced'?'STREDNE':'VYSOKE';
+    document.getElementById('mktV').textContent=MKT[d.market]||d.market;
 
     // Score Breakdown
     document.getElementById('bdwrap').style.display='block';
     const bdlist=document.getElementById('bdlist');bdlist.innerHTML='';
+    // Invalidation notice at top of breakdown
+    if(d.invalidated){
+      const inv=document.createElement('div');
+      inv.style.cssText='background:rgba(255,45,85,.08);border:1px solid rgba(255,45,85,.3);border-radius:4px;padding:7px 10px;margin-bottom:6px;font-family:"IBM Plex Mono",monospace;font-size:10px;color:#ff2d55;';
+      inv.textContent='NEPLATNY TRH: '+d.invalidReason;
+      bdlist.appendChild(inv);
+    }
     d.breakdown.forEach((item,i)=>{
       const div=document.createElement('div');
       div.className='bditem '+(item.ok?'ok':'no');
@@ -1572,22 +1664,29 @@ function run(){
       div.innerHTML=`<span class="bdl">${item.l}</span><span class="bdp">${item.p}</span>`;
       bdlist.appendChild(div);
     });
-    document.getElementById('bdtotal').textContent=`${d.score} / 100`;
+    document.getElementById('bdtotal').textContent=d.invalidated?'NEPLATNE':`${d.score} / 100`;
 
-    // AI
+    // Velocity + Reasoning
+    _pushSnapshot(d);
+    _renderVelocity();
+    _renderReasons(d.reasons);
+
+    // AI message
     document.getElementById('aiMode').textContent=`--mode=${mode}`;
-    const key=verdict==='VSTÚPIŤ'?'vstup':verdict==='POČKAŤ'?'cakaj':'nie';
-    typeAI(AI[key][Math.floor(Math.random()*AI[key].length)]);
+    const aiKey=verdict==='HIGH ALERT'||verdict==='ENTER'?'vstup':verdict==='WAIT'?'cakaj':'nie';
+    typeAI(AI[aiKey][Math.floor(Math.random()*AI[aiKey].length)]);
 
-    // Dots
+    // Status dots
     const[d1,d2,d3]=['dot1','dot2','dot3'].map(i=>document.getElementById(i));
-    if(verdict==='VSTÚPIŤ'){d1.className='sdt sdt-g';d2.className='sdt sdt-g';d3.className='sdt sdt-g';}
-    else if(verdict==='POČKAŤ'){d1.className='sdt sdt-g';d2.className='sdt sdt-a';d3.className='sdt sdt-a';}
+    if(verdict==='HIGH ALERT'){d1.className='sdt sdt-g';d2.className='sdt sdt-g';d3.className='sdt sdt-g';}
+    else if(verdict==='ENTER'){d1.className='sdt sdt-g';d2.className='sdt sdt-g';d3.className='sdt sdt-a';}
+    else if(verdict==='WAIT'){d1.className='sdt sdt-g';d2.className='sdt sdt-a';d3.className='sdt sdt-a';}
+    else if(verdict==='WATCH'){d1.className='sdt sdt-a';d2.className='sdt sdt-a';d3.className='sdt sdt-a';}
     else{d1.className='sdt sdt-a';d2.className='sdt sdt-r';d3.className='sdt sdt-r';}
 
-    // Save — mark timestamp so watchSignal skips duplicate auto-save within 35s
+    // Save
     _lastRunSaveMs=Date.now();
-    addSig({home,away,sH:d.sH,sA:d.sA,min:d.minute,mkt:MKT[d.market],sig:d.score,v:verdict,mode,stake,time:new Date().toTimeString().slice(0,5)});
+    addSig({home,away,sH:d.sH,sA:d.sA,min:d.minute,mkt:MKT[d.market]||d.market,sig:d.score,v:verdict,mode,stake,time:new Date().toTimeString().slice(0,5)});
 
     stopStandbyRot(); // verdict is set — stop standby rotation
     startTbRotation();
@@ -1762,13 +1861,13 @@ function watchSignal(d,verdict){
   if(d.attacks>60)       aiLog('Frekvencia nebezpečných útokov kritická','warn');
   if(d.corners>=8)       aiLog('Tlak rohov rastie — hrozba štandardných situácií','');
   if(d.xg>2.5)           aiLog('Prah xG prekročený — bezprostredné gólové riziko','alert');
-  if(verdict==='VSTÚPIŤ'&&conf>=75&&!document.getElementById('colRight')?.classList.contains('signal-lock')){
+  if((verdict==='ENTER'||verdict==='HIGH ALERT')&&conf>=68&&!document.getElementById('colRight')?.classList.contains('signal-lock')){
     activateSignalLock();
   }
-  if(verdict==='NESTÁVKOVAŤ'&&conf<35) aiLog('Nízky edge potvrdený — vstup neodporúčaný','err');
+  if(verdict==='NO BET'&&conf<36) aiLog('Nizky edge potvrdeny — vstup neodporucany','err');
 
   // Auto-alert state
-  if(shouldAlert&&verdict==='VSTÚPIŤ'){
+  if(shouldAlert&&(verdict==='ENTER'||verdict==='HIGH ALERT')){
     const colR=document.getElementById('colRight');
     if(colR&&!colR.classList.contains('enter-mode')){
       colR.classList.add('enter-mode');
@@ -1783,9 +1882,9 @@ function watchSignal(d,verdict){
         addSig({
           home,away,
           sH:d.sH,sA:d.sA,min:d.minute,
-          mkt:MKT[d.market],sig:d.score,
+          mkt:MKT[d.market]||d.market,sig:d.score,
           v:verdict,mode,
-          stake:getStake(d.score,mode),
+          stake:getStake(verdict,mode),
           time:new Date().toTimeString().slice(0,5)
         });
       } else {
@@ -1941,7 +2040,8 @@ async function applyMatchStats(triggerRun=false){
 
     // 4. Signal watcher (silent)
     const wd=calcScore();
-    watchSignal(wd, getVerdict(wd.score));
+    _pushSnapshot(wd);
+    watchSignal(wd, getVerdict(wd.score,wd.invalidated));
 
     // 5. Auto-run scoring on first match selection
     if(triggerRun) run();
