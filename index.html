@@ -2536,7 +2536,82 @@ function run(){
     stopStandbyRot(); // verdict is set — stop standby rotation
     startTbRotation();
     setTimeout(()=>{if(verdict!=='VSTÚPIŤ'){startSB();startStandbyRot();}},5000);
+
+    // Enrich right panel with server-side AI analysis (non-blocking)
+    runBAnalysis();
   });
+}
+
+// ── B-PANEL AI ANALYZE (/.netlify/functions/ai-analyze) ──
+// Called after run() to enrich the right panel with server-side AI reasoning.
+// Never freezes the UI — fallback is always shown on any error.
+let _bAnalysisBusy=false;
+async function runBAnalysis(){
+  if(_bAnalysisBusy||!liveFixtureId)return;
+  _bAnalysisBusy=true;
+
+  const home=document.getElementById('home').value.trim()||'Domáci';
+  const away=document.getElementById('away').value.trim()||'Hosťujúci';
+  const sH=parseInt(document.getElementById('scoreH').value)||0;
+  const sA=parseInt(document.getElementById('scoreA').value)||0;
+  const min=parseInt(document.getElementById('minute').value)||45;
+  const xg =parseInt(document.getElementById('s-xg')?.value)||0;
+  const shots=parseInt(document.getElementById('s-shots')?.value)||0;
+  const attacks=parseInt(document.getElementById('s-attacks')?.value)||0;
+  const corners=parseInt(document.getElementById('s-corners')?.value)||0;
+  const poss=parseInt(document.getElementById('s-poss')?.value)||50;
+  const pressure=parseInt(document.getElementById('s-pressure')?.value)||5;
+
+  const payload={
+    fixture:{home,away,scoreH:sH,scoreA:sA,minute:min},
+    sliders:{xg,shots,attacks,corners,poss,pressure},
+    market:document.getElementById('market')?.value||'goal_alert',
+    mode
+  };
+
+  const ctrl=new AbortController();
+  const t=setTimeout(()=>ctrl.abort(),11000);
+
+  try{
+    const res=await fetch('/.netlify/functions/ai-analyze',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payload),signal:ctrl.signal
+    });
+    clearTimeout(t);
+    let data;
+    const ct=res.headers.get('content-type')||'';
+    if(ct.includes('application/json')){data=await res.json();}
+    else{data={analysis:'Server chyba '+res.status,confidence:0,verdict:'WATCH',source:'error',_fallback:true};}
+    _renderBAnalysis(data);
+  }catch(e){
+    clearTimeout(t);
+    const fb={
+      analysis:e.name==='AbortError'?'AI analýza timeout — lokálne dáta sú platné.':'AI analýza nedostupná: '+e.message.slice(0,50),
+      confidence:0,verdict:'WATCH',source:'fallback',_fallback:true
+    };
+    _renderBAnalysis(fb);
+  }finally{
+    _bAnalysisBusy=false;
+  }
+}
+
+function _renderBAnalysis(d){
+  let el=document.getElementById('bAnalysisStrip');
+  if(!el){
+    const bw=document.getElementById('bdwrap');
+    if(!bw)return;
+    el=document.createElement('div');el.id='bAnalysisStrip';
+    el.style.cssText='margin-top:8px;padding:8px 10px;border-radius:4px;border:1px solid rgba(0,212,255,.15);background:rgba(0,12,18,.6);font-family:"IBM Plex Mono",monospace;font-size:10px;line-height:1.6;color:#5a8a7a;transition:border-color .3s';
+    bw.appendChild(el);
+  }
+  const srcBadge=d._fallback
+    ?'<span style="color:#ff6b2b;font-size:8px;letter-spacing:1px">◈ OFFLINE</span>'
+    :(d.source==='firecrawl+ai'
+      ?'<span style="color:#00d4ff;font-size:8px;letter-spacing:1px">◈ FIRECRAWL+AI</span>'
+      :'<span style="color:#00fff7;font-size:8px;letter-spacing:1px">◈ AI</span>');
+  const conf=d.confidence?`<span style="color:var(--c);font-family:'Orbitron',sans-serif;font-size:9px;font-weight:700">${d.confidence}%</span>`:'';
+  el.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">${srcBadge}${conf}</div><div style="color:#6a9a8a">${d.analysis||''}</div>`;
+  el.style.borderColor=d._fallback?'rgba(255,107,43,.2)':'rgba(0,212,255,.25)';
 }
 
 // ── PRESSURE GRAPH ──
@@ -2798,8 +2873,11 @@ async function fetchLiveMatches(){
   const st=document.getElementById('lvStatus');
   if(st) st.innerHTML='<span class="lv-dot"></span>Načítavam...';
   console.log('[fetchLiveMatches] starting fetch...');
+  const ctrl=new AbortController();
+  const t=setTimeout(()=>ctrl.abort(),9000);
   try{
-    const res=await fetch('/.netlify/functions/get-live-matches');
+    const res=await fetch('/.netlify/functions/get-live-matches',{signal:ctrl.signal});
+    clearTimeout(t);
     console.log('[fetchLiveMatches] HTTP status:', res.status);
     if(!res.ok) throw new Error(`HTTP ${res.status}`);
     const data=await res.json();
@@ -2827,8 +2905,10 @@ async function fetchLiveMatches(){
     }
     _updateMatchList(ms); // populates overlay + button status
   }catch(e){
+    clearTimeout(t);
     console.error('[fetchLiveMatches] error:', e.message);
-    if(st) st.textContent='Chyba: '+e.message.slice(0,50);
+    const msg=e.name==='AbortError'?'Timeout — skúsim znova':'Chyba: '+e.message.slice(0,50);
+    if(st) st.textContent=msg;
     if(sel) sel.innerHTML='<option value="">✕ chyba</option>';
     _updateMatchList([]); // triggers demo fallback
   }finally{
@@ -2850,9 +2930,12 @@ async function applyMatchStats(triggerRun=false){
   _fetchingStats=true;
   const st=document.getElementById('lvStatus');
   st.innerHTML='<span class="lv-dot"></span>Načítavam štatistiky...';
+  const ctrl=new AbortController();
+  const abortTimer=setTimeout(()=>ctrl.abort(),9000);
   try{
     const url=`/.netlify/functions/get-match-stats?fixture=${liveFixtureId}`;
-    const res=await fetch(url);
+    const res=await fetch(url,{signal:ctrl.signal});
+    clearTimeout(abortTimer);
     if(!res.ok)throw new Error(`HTTP ${res.status}`);
     const data=await res.json();
     if(data.error)throw new Error(data.error);
@@ -2900,9 +2983,11 @@ async function applyMatchStats(triggerRun=false){
     st.textContent=`Aktualizované · ${t} ${statsNote}· refresh za ${liveCountdown}s`;
 
   }catch(e){
+    clearTimeout(abortTimer);
     console.error('[APEX LIVE] error:',e);
-    st.textContent='Chyba: '+e.message.slice(0,60);
-    aiLog('Chyba načítania štatistík: '+e.message.slice(0,40),'err');
+    const msg=e.name==='AbortError'?'Timeout štatistík — obnovím za chvíľu':'Chyba: '+e.message.slice(0,60);
+    st.textContent=msg;
+    aiLog('Chyba načítania štatistík: '+(e.name==='AbortError'?'timeout':e.message.slice(0,40)),'err');
   }finally{
     _fetchingStats=false;
   }
@@ -3197,26 +3282,40 @@ async function sendChat(){
   send.disabled=true;
 
   addMsg('user',msg);
-  chatHistory.push({role:'user',content:`Aktuálny tiket: ${JSON.stringify(currentTicket||[])}\n\nOtázka: ${msg}`});
 
   // Typing indicator
   addMsg('ai','',true);
 
+  // AbortController ensures the UI never freezes — 12s hard limit
+  const ctrl=new AbortController();
+  const killTimer=setTimeout(()=>ctrl.abort(),12000);
+
   try{
     const body={
-      model:'claude-sonnet-4-20250514',
-      max_tokens:600,
+      model:'claude-haiku-4-5-20251001',
+      max_tokens:400,
       system:'Si AI ticket asistent pre APEX SIGNAL football betting terminál. Pracuješ IBA s aktuálne vygenerovaným tiketom. Odpovedaj KRÁTKO (max 4 vety), takticky, po SLOVENSKY. Môžeš: vysvetliť výbery, označiť najrizikovejší zápas, navrhnúť náhradu zápasu, zmeniť počet zápasov. Ak navrhuješ konkrétnu zmenu tiketu, začni odpoveď textom [ZMENA]:',
       messages:[{role:'user',content:`Tiket: ${JSON.stringify(currentTicket||[])}\n\nOtázka: ${msg}`}]
     };
 
     const chatHeaders={'Content-Type':'application/json'};
     if(window.APEX_CHAT_SECRET)chatHeaders['Authorization']='Bearer '+window.APEX_CHAT_SECRET;
-    const res=await fetch('/.netlify/functions/ai-chat',{method:'POST',headers:chatHeaders,body:JSON.stringify(body)});
-    const data=await res.json();
 
-    // Remove typing indicator
+    const res=await fetch('/.netlify/functions/ai-chat',{
+      method:'POST',headers:chatHeaders,body:JSON.stringify(body),signal:ctrl.signal
+    });
+
+    clearTimeout(killTimer);
     document.getElementById('tktTyping')?.remove();
+
+    // Netlify 504 returns HTML — guard against non-JSON body
+    let data;
+    const ct=res.headers.get('content-type')||'';
+    if(ct.includes('application/json')){
+      data=await res.json();
+    }else{
+      data={error:`Server chyba ${res.status} — skús znova`};
+    }
 
     const aiText=data.content?.[0]?.text||data.error||'Chyba komunikácie s AI.';
     addMsg('ai',aiText);
@@ -3227,14 +3326,16 @@ async function sendChat(){
     if(aiText.includes('[ZMENA]:')){
       pendingAiChange=aiText.split('[ZMENA]:').pop().trim();
       if(applyBtn){applyBtn.classList.add('visible');applyBtn.textContent=`◈ APLIKOVAŤ: ${pendingAiChange.slice(0,60)}...`;}
-    } else {
+    }else{
       pendingAiChange=null;
       if(applyBtn)applyBtn.classList.remove('visible');
     }
 
   }catch(e){
+    clearTimeout(killTimer);
     document.getElementById('tktTyping')?.remove();
-    addMsg('ai','Chyba pripojenia k AI: '+e.message.slice(0,60));
+    const isTimeout=e.name==='AbortError';
+    addMsg('ai',isTimeout?'AI neodpovedala včas — skús znova.':'Chyba: '+e.message.slice(0,60));
   }
 
   if(send)send.disabled=false;
